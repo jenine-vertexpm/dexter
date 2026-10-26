@@ -37,5 +37,6 @@ Then open the address it prints (usually http://localhost:5173) in your browser.
 
 ## Project documents
 
-- [`react-challenge-brief.md`](react-challenge-brief.md) – the challenge brief and requirements
+This project was built for a two-week AI-assisted React engineering challenge; the brief itself is not included in this repository.
+
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) – decision log

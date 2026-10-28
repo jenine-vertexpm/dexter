@@ -15,6 +15,13 @@ Dexter: a Pokédex and team builder built on the public PokéAPI, for a two-week
 - `npm run build` – type check + production build
 - `npm run lint` – lint
 
+## Git workflow
+
+- Never commit directly to `main`.
+- Each piece of work goes on its own short-lived branch (e.g. `feat/pokemon-list`, `docs/readme`), created from an up-to-date `main`.
+- Commit in small, meaningful steps, then push the branch and open a pull request with a description that explains the change.
+- Ask me before merging a pull request into `main`.
+
 ## Working with me
 
 - I'm a beginner with React. I want to understand every change.

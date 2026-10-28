@@ -1,0 +1,23 @@
+# Installed and built on this machine; the image installs and builds its own
+node_modules
+dist
+*.tsbuildinfo
+
+# Secrets and local settings
+.env
+.env.*
+*.local
+
+# Not needed to build the app
+.git
+.github
+.claude
+.vscode
+.idea
+docs
+*.md
+logs
+*.log
+Dockerfile
+.dockerignore
+compose.yaml

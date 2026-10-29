@@ -23,3 +23,7 @@ body {
   font-weight: 700;
   text-decoration: none;
 }
+
+.error-message p {
+  margin: 0 0 8px;
+}

@@ -1,17 +1,20 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App.tsx'
+import { listHandlers } from './test/handlers.ts'
+import { renderWithProviders } from './test/render.tsx'
+import { server } from './test/server.ts'
 
-// MemoryRouter is a router that keeps its address in memory instead of the browser's
-// address bar, so each test can start at whichever URL it needs.
+// The list page loads data, so the fake PokéAPI answers its requests
+beforeEach(() => {
+  server.use(...listHandlers().handlers)
+})
+
+// renderWithProviders uses a MemoryRouter: a router that keeps its address in memory instead
+// of the browser's address bar, so each test can start at whichever URL it needs.
 function renderAt(url: string) {
-  return render(
-    <MemoryRouter initialEntries={[url]}>
-      <App />
-    </MemoryRouter>,
-  )
+  return renderWithProviders(<App />, { url })
 }
 
 describe('routes', () => {

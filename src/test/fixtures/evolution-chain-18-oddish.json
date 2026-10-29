@@ -1,0 +1,37 @@
+{
+  "id": 18,
+  "chain": {
+    "is_baby": false,
+    "species": {
+      "name": "oddish",
+      "url": "https://pokeapi.co/api/v2/pokemon-species/43/"
+    },
+    "evolves_to": [
+      {
+        "is_baby": false,
+        "species": {
+          "name": "gloom",
+          "url": "https://pokeapi.co/api/v2/pokemon-species/44/"
+        },
+        "evolves_to": [
+          {
+            "is_baby": false,
+            "species": {
+              "name": "vileplume",
+              "url": "https://pokeapi.co/api/v2/pokemon-species/45/"
+            },
+            "evolves_to": []
+          },
+          {
+            "is_baby": false,
+            "species": {
+              "name": "bellossom",
+              "url": "https://pokeapi.co/api/v2/pokemon-species/182/"
+            },
+            "evolves_to": []
+          }
+        ]
+      }
+    ]
+  }
+}

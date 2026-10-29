@@ -1,0 +1,76 @@
+{
+  "id": 133,
+  "name": "eevee",
+  "evolution_chain": {
+    "url": "https://pokeapi.co/api/v2/evolution-chain/67/"
+  },
+  "varieties": [
+    {
+      "is_default": true,
+      "pokemon": {
+        "name": "eevee",
+        "url": "https://pokeapi.co/api/v2/pokemon/133/"
+      }
+    },
+    {
+      "is_default": false,
+      "pokemon": {
+        "name": "eevee-starter",
+        "url": "https://pokeapi.co/api/v2/pokemon/10159/"
+      }
+    },
+    {
+      "is_default": false,
+      "pokemon": {
+        "name": "eevee-gmax",
+        "url": "https://pokeapi.co/api/v2/pokemon/10205/"
+      }
+    }
+  ],
+  "flavor_text_entries": [
+    {
+      "flavor_text": "Its genetic code\nis irregular.\nIt may mutate if\fit is exposed to\nradiation from\nelement STONEs.",
+      "language": {
+        "name": "en",
+        "url": "https://pokeapi.co/api/v2/language/9/"
+      },
+      "version": {
+        "name": "red",
+        "url": "https://pokeapi.co/api/v2/version/1/"
+      }
+    },
+    {
+      "flavor_text": "Its genetic code\nis irregular.\nIt may mutate if\fit is exposed to\nradiation from\nelement STONEs.",
+      "language": {
+        "name": "en",
+        "url": "https://pokeapi.co/api/v2/language/9/"
+      },
+      "version": {
+        "name": "blue",
+        "url": "https://pokeapi.co/api/v2/version/2/"
+      }
+    },
+    {
+      "flavor_text": "Its genetic code\nis unstable, so it\ncould evolve in\fa variety of ways.\nThere are only a\nfew alive.",
+      "language": {
+        "name": "en",
+        "url": "https://pokeapi.co/api/v2/language/9/"
+      },
+      "version": {
+        "name": "yellow",
+        "url": "https://pokeapi.co/api/v2/version/3/"
+      }
+    },
+    {
+      "flavor_text": "Son ADN particulier lui permet de\ns’adapter très rapidement à son\nenvironnement.",
+      "language": {
+        "name": "fr",
+        "url": "https://pokeapi.co/api/v2/language/5/"
+      },
+      "version": {
+        "name": "black",
+        "url": "https://pokeapi.co/api/v2/version/17/"
+      }
+    }
+  ]
+}

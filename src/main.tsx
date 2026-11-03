@@ -6,7 +6,7 @@ import './index.css'
 import App from './App.tsx'
 import { createQueryClient } from './queries/queryClient.ts'
 
-// One cache for the whole visit: everything loaded from PokéAPI is kept here and reused
+// One cache for the whole visit: everything loaded from PokéAPI is kept here and reused - shared manager for cached data
 const queryClient = createQueryClient()
 
 // BrowserRouter keeps the app in sync with the address bar and the Back/Forward buttons

@@ -1,3 +1,4 @@
+//import React’s useMemo, URL tools, shared components, list-state helpers, list-processing logic, the species-index query, and the page’s CSS.
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { ErrorMessage } from '../components/ErrorMessage.tsx'
@@ -7,19 +8,17 @@ import { parseListParams, toListParams, type ListState } from '../domain/listPar
 import { queryList, toSpeciesEntries } from '../domain/speciesList.ts'
 import { useSpeciesIndex } from '../queries/pokeApiQueries.ts'
 import './PokemonListPage.css'
-
-// The URL for the list with this state, e.g. "?page=2". Keeps any other list settings as they are.
 const linkToState = (state: ListState) => ({ search: toListParams(state).toString() })
 
 export function PokemonListPage() {
-  // The URL is the one place the list's state lives: reloading or sharing it shows the same page
+  // read the URL’s query parameters, convert them to a safe list state, and request the species index. The URL is intended to be the source of truth for page, search, and filters.
   const [searchParams] = useSearchParams()
   const state = parseListParams(searchParams)
   const index = useSpeciesIndex()
 
-  // Turning ~1000 species into entries is only redone when the index itself changes
+  // turn the API’s index into entries with IDs and names. useMemo avoids repeating that conversion unless the index data changes.
   const entries = useMemo(() => (index.data ? toSpeciesEntries(index.data) : []), [index.data])
-  // Search and type filters are added in plan steps S7 and S8
+  // 
   const result = queryList(entries, { search: '', typeFilters: [], page: state.page })
 
   return (

@@ -144,6 +144,20 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What I changed and why:** Accepted (merged in PR #11). TODO: why, in your own words.
 **What I did not understand at first:** TODO: fill in yourself.
 
+## 2026-11-03 - Search history: one entry per search, not one per keystroke
+**Context:** Step S7 (search, PR #14). This refines the "Search and browser history" entry above (plan decision D6), which said typing replaces the current history entry. The S7 acceptance criterion says that after typing several letters, Back goes to the state *before* the search started. If every keystroke replaced the entry, the first one included, that earlier state (for example page 2) would be overwritten, and Back would skip past it.
+**What I asked the AI:** Implement S7 using replace navigation while typing, and meet the plan's acceptance criteria. It pointed out the conflict and asked me to choose between "always replace" and "add one entry, then replace".
+**What it gave me:**
+- **The rule:** the first change in a new search (empty box → text) adds one browser history entry. Later keystrokes replace that entry instead of adding more. Editing a search that is already in the box counts as the same search, so it also replaces.
+- **Back and Forward:** Back after searching restores the exact list state from before the search began, such as the page it was on. Forward restores the search.
+- **Unchanged from D6:** typing never adds one entry per letter, and page and type-filter changes still add an entry.
+- **Where:** `changeSearch` in `src/pages/PokemonListPage.tsx` replaces unless the search was empty before.
+**Verified against:**
+- Tests in `src/pages/PokemonListPage.test.tsx` (`search`): on page 2, typing `pik` then one Back returns to `?page=2`. A search, then the next page, then Back restores the search on page 1. Making every keystroke replace made the first test fail.
+- Manual check in the browser after merging PR #14: typing, Back and Forward, and the Network tab all behaved as expected.
+**What I changed and why:** Chose "add one entry, then replace", so the user can undo an entire search with one Back action, rather than navigating backwards through individual keystrokes.
+**What I did not understand at first:** TODO: fill in yourself.
+
 ## Where AI cost me time
 
 Times the AI sent me down a wrong path: hallucinated APIs, outdated React patterns, code that looked right and was not.

@@ -1,3 +1,4 @@
+//calls fetch. handles HTTP errors, timeouts, cancellation, JSON parsing, and response validation.
 import type { z } from 'zod'
 import {
   evolutionChainSchema,

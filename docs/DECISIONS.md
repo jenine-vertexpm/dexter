@@ -19,28 +19,18 @@ One entry per significant decision (not every prompt). Copy the template below f
 **Context:** Building the typed, schema-validated API client for M1. The brief (§3.2) requires every response to be validated at the boundary with a schema library, with TypeScript types generated from the schemas.
 **What I asked the AI:** Build the typed, schema-validated client. It offered a choice between zod and valibot.
 **What it gave me:** Zod: the most widely used option with the most examples (helpful while learning), at the cost of a larger download (roughly 15-20 KB) than valibot (a few KB). The schema lists only the fields we use; zod drops the rest. The `ApiPokemon` type is generated from the schema with `z.infer`, so the type and the runtime check can't drift apart.
-**What I changed and why:** Picked zod (the recommended option); no changes to what the AI built. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Picked zod (the recommended option) because it was what was most widely used and so felt moe reliable. 
+**What I did not understand at first:** I did not understand even the need for a library like Zod or what it did. Once I understood it's functionality, it made sense and a larger download didn't seem much of a factor.
 
 ## 2026-10-28 - First API endpoint: one Pokémon by name
 **Context:** M1 needs a typed, schema-validated client for one endpoint. I had to pick which one.
 **What I asked the AI:** Which endpoint the first client function should cover.
 **What it gave me:** Two options: `GET /pokemon/{name}` or the paginated list `GET /pokemon?limit=20&offset=0`. It recommended the single Pokémon: richer data to validate (types, stats, abilities, artwork that can be `null`), a real 404 for unknown names, and both the detail page and the list cards will need it. The list endpoint only returns names and URLs, with no types or artwork.
 **Verified against:** Real PokéAPI responses for `eevee`, `pikachuu` (404), `pikachu-gmax`, `koraidon-sprinting-build` and `pecharunt`. They showed that a single Pokémon is a ~249 KB response, height and weight come in decimetres and hectograms, artwork URLs can be `null`, and alternate forms point back to their species (`pikachu-gmax` → `pikachu`).
-**What I changed and why:** Picked one Pokémon by name (the recommended option); no changes to what the AI built. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Picked one Pokémon by name (the recommended option) because it provides richer data to validate
+**What I did not understand at first:** The concept of a first API connection. But as explained, at the beginning, the app needed its first working connection to PokéAPI. The decision was about which kind of request to teach the API client to make first. One option asks for one specific Pokémon, the other asks for a page of Pokémon from a list. So the decision was: “Should the first API function fetch one Pokémon’s information, or fetch a slice of the Pokémon index?”
 
-## 2026-10-29 - M2 scope: the full brief spec, with later items placed in later milestones
-**Context:** Planning M2 (browse and detail). The milestone table gives only a one-line summary of M2, but the brief's detailed sections say much more.
-**What I asked the AI:** Plan M2 from the actual repo and brief, in small steps that can be reviewed one at a time.
-**What it gave me:** A 12-step plan (`docs/plans/M2.md`) that maps every brief requirement to a milestone.
-**What I changed and why:** I decided M2 covers the *full* §2 spec for browse, search/filter, detail and matchups, not just the one-line summary. Other placements:
-- **M2:** request timeouts and retrying server errors with backoff (§3.2). The milestone table doesn't place them, and M2 builds the client and data layer they belong to.
-- **M2, as "Step 0" PRs:** the "`any` is a lint error" rule and a PR template. Both are brief requirements left over from M1 (oxlint does not flag `any` with our current config, and there is no PR template).
-- **M4:** request-budget measurement, route code-splitting, axe checks and end-to-end tests.
 
-TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
 
 ## 2026-10-29 - Test stack: Vitest, jsdom, React Testing Library, MSW
 **Context:** M2 needs green unit and component tests. The repo had no test runner or test script.
@@ -52,21 +42,21 @@ TODO: why, in your own words.
 - **MSW** answers the app's API requests with fake responses, so tests never hit the real PokéAPI.
 
 It found one conflict. jsdom 30 needs Node ≥ 22.22.2, and my local Node is 22.13.1 (CI and Docker are newer). It proposed jsdom 29, which supports Node ^22.13. It also proposed MSW 2.x over the new 3.x because the v2 API is what most documentation describes.
-**Verified against:** `npm view <package> version peerDependencies engines` for each package on 2026-10-29; local `node -v`.
-**What I changed and why:** Accepted. Upgrading local Node would allow the newest versions instead. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+
+**What I changed and why:** Accepted. Upgrading local Node would allow the newest versions instead. Upgrading local Node seemed like a minor, inconsquential fix to enable a test stack.
+**What I did not understand at first:** What a test stact would do - now I understand it is a group of tools for running automatic checks on the code.
 
 ## 2026-10-29 - Router: React Router v7, declarative mode
 **Context:** The brief requires a client-side router with list, detail and not-found routes. The list state lives in the URL.
 **What I asked the AI:** Pick a conventional router that supports the routes, query parameters and browser history.
 **What it gave me:** React Router in "declarative mode" (`BrowserRouter`, `Routes`, `useParams`, `useSearchParams`, `Link`). It can either replace the current history entry or add a new one, which the search-history rule needs. Its data loaders are not used, because TanStack Query handles data. v8 needs Node ≥ 22.22.0, so v7 (Node ≥ 20) was chosen.
 **Verified against:** `npm view react-router@7` and `react-router` (v8) engines and peer dependencies, 2026-10-29.
-**What I changed and why:** Accepted. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Accepted.  I added React Router v7. I chose its simpler declarative setup because this app needs the router to match URLs to pages, while TanStack Query already handles API data. The URL holds the list settings so a list view can be refreshed, bookmarked or shared, and the browser history can restore earlier list views. 
+**What I did not understand at first:** What a client side router does (decides which React screen to show for the current URL) or declartive mode (the app describes the URL-to-screen map directly in JSX)
 
 ## 2026-10-29 - Data fetching: TanStack Query
 **Context:** The brief requires caching, retries, cancelling unneeded requests, loading and error states, and never showing results for an older query. API data must also be kept separate from state the user owns.
-**What I asked the AI:** Use an established library, TanStack Query if it fits, rather than building our own cache.
+**What I asked the AI:** Use an established library rather than building our own cache.
 **What it gave me:** TanStack Query v5 (works with React 19). The plan:
 - **Cancellation:** pass TanStack's `signal` to our client, so requests are cancelled when they become out of date or unused.
 - **Retries:** retry network errors, timeouts and 5xx only, never 404 or invalid responses, using TanStack's default backoff.
@@ -74,9 +64,9 @@ It found one conflict. jsdom 30 needs Node ≥ 22.22.2, and my local Node is 22.
 - **Caching:** set both `staleTime` and `gcTime` to `Infinity`. With only `staleTime` set, the default 5-minute `gcTime` would throw away data for pages you left, and going back would request it again. That breaks the brief's "returning to a page you have already seen makes none".
 
 API data lives in TanStack Query. List state (page, search, types) lives in the URL. Teams come in M3.
-**Verified against:** TanStack Query docs, guides "Query Cancellation" (signal aborted when a query *"becomes out-of-date or inactive"*, only if the signal is used) and "Query Retries" (default 3 retries, `retryDelay` `min(1000 * 2 ** attemptIndex, 30000)`). The `staleTime`/`gcTime` defaults and offline ("network mode") behaviour are still to be checked against the docs in plan step S5.
-**What I changed and why:** I asked for TanStack Query instead of a hand-written cache, and kept custom code to the retry rule and settings. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+
+**What I changed and why:** I asked for TanStack Query instead of a hand-written cache.
+**What I did not understand at first:** It seemed more time efficent and reliable to use something already established than building from scratch. 
 
 ## 2026-10-29 - Search and filter in the browser, over the species index
 **Context:** PokéAPI has no search endpoint, and the brief calls this one of the most important decisions. The list must also show each species once, without alternate forms.
@@ -92,8 +82,8 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
   - a scheduled smoke test in M4.
 - **Remaining risk:** the type filter could be wrong if the ids ever stop matching. The smoke test is there to catch that.
 **Verified against:** live responses on 2026-10-29: `/pokemon-species?limit=100000` (count 1025), `/pokemon?limit=100000` (1351 entries, 326 with ids above 10000), `/type/fire` (109 Pokémon, 28 of them alternate forms). The docs (pokeapi.co/docs/v2) say `is_default` is *"set for exactly one Pokémon used as the default for each species"*. They do not say the ids match.
-**What I changed and why:** Accepted the approach and asked for a safeguard on the id assumption. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Accepted the approach and asked for a safeguard on the id assumption. 
+**What I did not understand at first:** , I didn’t understand that the app would fetch one list of species names and URLs, search that list locally, and fetch full details only for the Pokémon shown on the current page.
 
 ## 2026-10-29 - Type matchups: fixed 18 battle types, current damage relations
 **Context:** The detail page must show, for every attacking type, the damage multiplier against this Pokémon, and only types that exist in battle.

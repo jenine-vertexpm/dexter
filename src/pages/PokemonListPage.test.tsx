@@ -136,10 +136,11 @@ describe('pages in the URL', () => {
   })
 
   it('keeps other list settings in the URL when changing page', async () => {
-    renderList('/?type=fire')
+    // "e" matches more than one page of species
+    renderList('/?q=e')
     await cardNames()
 
-    expect(screen.getByRole('link', { name: 'Next page' })).toHaveAttribute('href', '/?type=fire&page=2')
+    expect(screen.getByRole('link', { name: 'Next page' })).toHaveAttribute('href', '/?q=e&page=2')
   })
 
   it('explains a page past the end and links back to page 1', async () => {
@@ -156,7 +157,8 @@ describe('pages in the URL', () => {
   it('makes no new requests when returning to a page already seen', async () => {
     const user = userEvent.setup()
     renderList()
-    await screen.findAllByText('normal')
+    // Wait until a card has loaded its types ("normal" is also a type filter checkbox, so look inside the card)
+    await within(await screen.findByRole('article', { name: PAGE_1_FIRST })).findByText('normal')
     await user.click(screen.getByRole('link', { name: 'Next page' }))
     await screen.findByRole('article', { name: 'spearow' })
     await user.click(screen.getByRole('link', { name: 'Previous page' }))
@@ -294,8 +296,9 @@ describe('search', () => {
 
   it('goes back to page 1 when the search changes, and keeps other settings in the URL', async () => {
     const user = userEvent.setup()
+    // The fire filter has one page, so page 2 is past the end until the search resets it
     renderList('/?type=fire&page=2')
-    await cardNames()
+    await screen.findByText(/Page 2 does not exist/)
 
     await user.type(searchBox(), 'a')
 
@@ -383,5 +386,156 @@ describe('search', () => {
     await within(screen.getByRole('article', { name: 'raichu' })).findByText('normal')
     expect(screen.queryByRole('article', { name: 'rattata' })).not.toBeInTheDocument()
     expect(queryClient.getQueryData(['pokeapi', 'pokemon-summary', 19])).toBeUndefined()
+  })
+})
+
+describe('type filter', () => {
+  const typeBox = (name: string) => screen.getByRole('checkbox', { name })
+
+  it('shows only Pokémon of one type', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+
+    await user.click(typeBox('fire'))
+
+    expect(currentQuery()).toBe('?type=fire')
+    expect(typeBox('fire')).toBeChecked()
+    expect(await cardNames()).toEqual(['charmander', 'charmeleon', 'charizard', 'flareon'])
+  })
+
+  it('with two types, shows only Pokémon that have both', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+
+    await user.click(typeBox('fire'))
+    await user.click(typeBox('flying'))
+
+    expect(currentQuery()).toBe('?type=fire&type=flying')
+    expect(await cardNames()).toEqual(['charizard'])
+  })
+
+  it('combines with the name search', async () => {
+    const user = userEvent.setup()
+    renderList('/?q=p')
+    await cardNames()
+
+    await user.click(typeBox('flying'))
+
+    expect(currentQuery()).toBe('?q=p&type=flying')
+    expect(await cardNames()).toEqual(['pidgey', 'pidgeotto', 'pidgeot', 'spearow'])
+  })
+
+  it('goes back to page 1 and adds a history entry, so Back undoes the change', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+    await user.click(screen.getByRole('link', { name: 'Next page' }))
+    await cardNames()
+
+    await user.click(typeBox('fire'))
+    expect(currentQuery()).toBe('?type=fire')
+
+    await user.click(screen.getByRole('button', { name: 'Browser back' }))
+
+    expect(currentQuery()).toBe('?page=2')
+    expect(typeBox('fire')).not.toBeChecked()
+    expect(await cardNames()).toEqual(PAGE_2)
+  })
+
+  it('shows that types are loading, without showing unfiltered cards', async () => {
+    server.use(
+      http.get(`${API}/type/fire`, async () => {
+        await delay('infinite')
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+
+    await user.click(typeBox('fire'))
+
+    expect(await screen.findByText('Loading types…')).toBeInTheDocument()
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
+  })
+
+  it('shows an error with a retry button when a type fails, and filters on retry', async () => {
+    server.use(http.get(`${API}/type/fire`, () => new HttpResponse(null, { status: 500 }), { once: true }))
+    const user = userEvent.setup()
+    renderList('/?type=fire')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Could not load the fire type. PokéAPI had a problem (error 500).')
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
+
+    await user.click(within(alert).getByRole('button', { name: 'Retry loading the fire type' }))
+
+    expect(await cardNames()).toEqual(['charmander', 'charmeleon', 'charizard', 'flareon'])
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('says when nothing has the chosen types, naming the filters', async () => {
+    renderList('/?type=fire&type=water')
+
+    expect(await screen.findByText('No Pokémon have the types fire and water.')).toBeInTheDocument()
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
+  })
+
+  it('names the search and the type when nothing matches both', async () => {
+    renderList('/?q=squirt&type=fire')
+
+    expect(await screen.findByText("No Pokémon match 'squirt' with the type fire.")).toBeInTheDocument()
+  })
+
+  it('restores types, search and page from a shared URL', async () => {
+    renderList('/?type=fire&type=flying&q=char&page=1')
+
+    expect(await cardNames()).toEqual(['charizard'])
+    expect(typeBox('fire')).toBeChecked()
+    expect(typeBox('flying')).toBeChecked()
+    expect(screen.getByRole('searchbox', { name: 'Search Pokémon by name' })).toHaveValue('char')
+    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument()
+  })
+
+  it('ignores unknown types and any type after the second in the URL', async () => {
+    renderList('/?type=stellar&type=fire&type=flying&type=water')
+
+    expect(await cardNames()).toEqual(['charizard'])
+    expect(typeBox('water')).not.toBeChecked()
+    expect(counts.types.has('stellar')).toBe(false)
+    expect(counts.types.has('water')).toBe(false)
+  })
+
+  it('blocks a third type and explains why', async () => {
+    const user = userEvent.setup()
+    renderList('/?type=fire&type=flying')
+    await cardNames()
+
+    expect(typeBox('water')).toBeDisabled()
+    expect(typeBox('fire')).toBeEnabled()
+    expect(screen.getByRole('group', { name: 'Filter by type' })).toHaveAccessibleDescription(
+      'You have chosen 2 types, the most allowed. Untick one to choose a different type.',
+    )
+
+    await user.click(typeBox('fire'))
+
+    expect(typeBox('water')).toBeEnabled()
+    expect(currentQuery()).toBe('?type=flying')
+  })
+
+  it('reuses a type it has already loaded', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+
+    await user.click(typeBox('fire'))
+    await screen.findByRole('article', { name: 'flareon' })
+    await user.click(typeBox('fire'))
+    await user.click(typeBox('fire'))
+    await screen.findByRole('article', { name: 'flareon' })
+
+    expect(counts.types.get('fire')).toBe(1)
   })
 })

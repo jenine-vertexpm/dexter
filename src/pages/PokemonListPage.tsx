@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router'
 import { ErrorMessage } from '../components/ErrorMessage.tsx'
 import { Pagination } from '../components/Pagination.tsx'
 import { PokemonCard } from '../components/PokemonCard.tsx'
-import { parseListParams, toListParams, type ListState } from '../domain/listParams.ts'
+import { MAX_SEARCH_LENGTH, parseListParams, toListParams, type ListState } from '../domain/listParams.ts'
 import { queryList, toSpeciesEntries } from '../domain/speciesList.ts'
 import { useSpeciesIndex } from '../queries/pokeApiQueries.ts'
 import './PokemonListPage.css'
@@ -12,23 +12,46 @@ const linkToState = (state: ListState) => ({ search: toListParams(state).toStrin
 
 export function PokemonListPage() {
   // read the URL’s query parameters, convert them to a safe list state, and request the species index. The URL is intended to be the source of truth for page, search, and filters.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const state = parseListParams(searchParams)
   const index = useSpeciesIndex()
+
+  // Each keystroke writes the search to `q` and goes back to page 1, keeping other settings.
+  // The first letter of a new search adds one history entry; later letters replace it, so Back
+  // returns to where you were before searching, not to the previous letter (plan S7, D6).
+  function changeSearch(search: string) {
+    setSearchParams(toListParams({ ...state, search, page: 1 }), { replace: state.search !== '' })
+  }
+  const searchText = state.search.trim()
 
   // turn the API’s index into entries with IDs and names. useMemo avoids repeating that conversion unless the index data changes.
   const entries = useMemo(() => (index.data ? toSpeciesEntries(index.data) : []), [index.data])
   // 
-  const result = queryList(entries, { search: '', typeFilters: [], page: state.page })
+  const result = queryList(entries, { search: state.search, typeFilters: [], page: state.page })
 
   return (
     <>
       <h1>Pokémon</h1>
+      {/* The box shows the URL's `q`, so the URL stays the one place the search lives */}
+      <div className="search">
+        <label htmlFor="pokemon-search">Search Pokémon by name</label>
+        <input
+          id="pokemon-search"
+          type="search"
+          autoComplete="off"
+          maxLength={MAX_SEARCH_LENGTH}
+          value={state.search}
+          onChange={(event) => changeSearch(event.target.value)}
+        />
+      </div>
       {index.isPending && <p role="status">Loading Pokémon…</p>}
       {index.isError && (
         <ErrorMessage error={index.error} onRetry={() => void index.refetch()} what="the Pokémon list" />
       )}
-      {index.isSuccess && result.total === 0 && <p>No Pokémon found.</p>}
+      {/* React shows the search as plain text, so typed markup is never treated as HTML */}
+      {index.isSuccess && result.total === 0 && (
+        <p>{searchText === '' ? 'No Pokémon found.' : `No Pokémon match '${searchText}'`}</p>
+      )}
       {index.isSuccess && result.total > 0 && result.items.length === 0 && (
         <p>
           Page {state.page} does not exist. There {result.totalPages === 1 ? 'is' : 'are'} only {result.totalPages}{' '}

@@ -1,3 +1,18 @@
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 320px;
+  margin-bottom: 16px;
+}
+
+.search input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+}
+
 /* Cards fill the width: 2 columns at 360px, more on wider screens */
 .pokemon-grid {
   display: grid;

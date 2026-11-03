@@ -14,6 +14,7 @@ export function createTestQueryClient(): QueryClient {
 
 // Renders a component the way the app does: inside the query cache and a router at `url`.
 // A fresh client per test, so no cached data leaks from one test into another.
+// useTransitions={false} matches the app's BrowserRouter (see main.tsx).
 export function renderWithProviders(
   ui: ReactNode,
   { url = '/', queryClient = createTestQueryClient() }: { url?: string; queryClient?: QueryClient } = {},
@@ -22,7 +23,7 @@ export function renderWithProviders(
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[url]}>{ui}</MemoryRouter>
+        <MemoryRouter initialEntries={[url]} useTransitions={false}>{ui}</MemoryRouter>
       </QueryClientProvider>,
     ),
   }

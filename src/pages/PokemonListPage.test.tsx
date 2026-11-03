@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { useLocation, useNavigate } from 'react-router'
@@ -263,5 +263,125 @@ describe('cards', () => {
 
     expect(await within(card).findByText('grass')).toBeInTheDocument()
     expect(card).toHaveTextContent('#0001')
+  })
+})
+
+describe('search', () => {
+  const searchBox = () => screen.getByRole('searchbox', { name: 'Search Pokémon by name' })
+
+  it('finds Pokémon by part of the name, ignoring upper and lower case', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+
+    await user.type(searchBox(), 'PIK')
+
+    expect(currentQuery()).toBe('?q=PIK')
+    expect(await cardNames()).toEqual(['pikachu'])
+
+    await user.clear(searchBox())
+    await user.type(searchBox(), 'saur')
+
+    expect(await cardNames()).toEqual(['bulbasaur', 'ivysaur', 'venusaur'])
+  })
+
+  it('shows the search from the URL, so reloading or sharing the link keeps it', async () => {
+    renderList('/?q=pik')
+
+    expect(await cardNames()).toEqual(['pikachu'])
+    expect(searchBox()).toHaveValue('pik')
+  })
+
+  it('goes back to page 1 when the search changes, and keeps other settings in the URL', async () => {
+    const user = userEvent.setup()
+    renderList('/?type=fire&page=2')
+    await cardNames()
+
+    await user.type(searchBox(), 'a')
+
+    expect(currentQuery()).toBe('?q=a&type=fire')
+    expect(screen.getByText(/^Page 1 of/)).toBeInTheDocument()
+  })
+
+  it('says when nothing matches, showing the search as plain text', async () => {
+    const user = userEvent.setup()
+    const { container } = renderList()
+    await cardNames()
+
+    await user.type(searchBox(), '<b>zz</b>')
+
+    expect(screen.getByText("No Pokémon match '<b>zz</b>'")).toBeInTheDocument()
+    expect(container.querySelector('b')).toBeNull()
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).not.toBeInTheDocument()
+  })
+
+  it('adds one history entry for a search, not one per letter: Back returns to before the search', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+    await user.click(screen.getByRole('link', { name: 'Next page' }))
+    await cardNames()
+
+    await user.type(searchBox(), 'pik')
+    expect(currentQuery()).toBe('?q=pik')
+
+    // One Back skips every letter typed and lands on page 2, as it was before searching
+    await user.click(screen.getByRole('button', { name: 'Browser back' }))
+
+    expect(currentQuery()).toBe('?page=2')
+    expect(searchBox()).toHaveValue('')
+    expect(await cardNames()).toEqual(PAGE_2)
+  })
+
+  it('restores the earlier search and page with Back after a page change', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await cardNames()
+    await user.type(searchBox(), 'e')
+    await user.click(screen.getByRole('link', { name: 'Next page' }))
+    expect(currentQuery()).toBe('?q=e&page=2')
+
+    await user.click(screen.getByRole('button', { name: 'Browser back' }))
+
+    expect(currentQuery()).toBe('?q=e')
+    expect(searchBox()).toHaveValue('e')
+    expect(screen.getByText(/^Page 1 of/)).toBeInTheDocument()
+  })
+
+  it('never shows a result from an earlier search, and cancels its slow request', async () => {
+    // Rattata matches "ra" but not "rai". Its request hangs until the test lets it finish.
+    let rattataAborted = false
+    let finishRattata = () => {}
+    const rattataWaits = new Promise<void>((resolve) => {
+      finishRattata = resolve
+    })
+    server.use(
+      http.get(`${API}/pokemon/19`, async ({ request }) => {
+        request.signal.addEventListener('abort', () => {
+          rattataAborted = true
+        })
+        await rattataWaits
+        return HttpResponse.json(fakePokemon(19, 'rattata'))
+      }),
+    )
+    const user = userEvent.setup()
+    const { queryClient } = renderList('/?q=ra')
+    expect(await cardNames()).toEqual(['rattata', 'raticate', 'raichu', 'nidoran-f'])
+    expect(within(screen.getByRole('article', { name: 'rattata' })).getByRole('status')).toHaveTextContent('Loading…')
+
+    await user.type(searchBox(), 'i')
+
+    // The grid matches the latest search only
+    expect(currentQuery()).toBe('?q=rai')
+    expect(await cardNames()).toEqual(['raichu'])
+    // Rattata's card is gone, so its request is no longer needed and is cancelled
+    await waitFor(() => expect(rattataAborted).toBe(true))
+
+    // Even when the slow response finally arrives, it is not used or shown
+    finishRattata()
+    await within(screen.getByRole('article', { name: 'raichu' })).findByText('normal')
+    expect(screen.queryByRole('article', { name: 'rattata' })).not.toBeInTheDocument()
+    expect(queryClient.getQueryData(['pokeapi', 'pokemon-summary', 19])).toBeUndefined()
   })
 })

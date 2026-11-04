@@ -11,6 +11,7 @@ Real PokéAPI responses, fetched on 2026-10-29 and trimmed so tests stay small a
 |---|---|
 | `pokemon-386-deoxys-normal.json` | Default Pokémon whose name differs from its species (`deoxys`) |
 | `pokemon-212-scizor.json` | Dual type (bug/steel) |
+| `pokemon-133-eevee.json` | Has a hidden ability (anticipation). Fetched 2026-11-04. |
 | `species-deoxys.json`, `species-eevee.json` | Varieties, evolution chain link, raw flavour text |
 | `evolution-chain-1-bulbasaur.json` | Linear chain |
 | `evolution-chain-67-eevee.json` | Branches at the first step (8 evolutions) |

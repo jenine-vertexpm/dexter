@@ -132,6 +132,38 @@
   background: currentColor;
 }
 
+/* The evolution tree: each step indented under the species it evolves from, with a line
+   down the left so branches that share a parent are visibly grouped */
+.evolution-tree,
+.evolution-tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evolution-tree ul {
+  margin-left: 8px;
+  padding-left: 16px;
+  border-left: 2px solid #8884;
+}
+
+.evolution-tree li {
+  padding: 2px 0;
+}
+
+.evolution-tree ul > li::before {
+  /* After the "/": empty alt text, so screen readers skip the arrow (the list nesting says it already) */
+  content: '→ ' / '';
+}
+
+.evolution-tree a {
+  text-transform: capitalize;
+}
+
+.evolution-current {
+  font-weight: 700;
+}
+
 .species-nav {
   display: flex;
   flex-wrap: wrap;

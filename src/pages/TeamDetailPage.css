@@ -1,0 +1,87 @@
+/* Lets code move focus to the heading after a Remove, without a focus ring on a non-control */
+.team-members-heading:focus {
+  outline: none;
+}
+
+.team-members {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.team-member {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #8884;
+  border-radius: 8px;
+}
+
+.team-member-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* The same size whether the artwork has loaded, is loading or is missing, so nothing jumps */
+.team-member-artwork {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+}
+
+.team-member-artwork-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #8882;
+  font-size: 0.8rem;
+}
+
+.team-member-text {
+  /* Lets long nicknames or error messages wrap instead of widening the card */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.team-member-text p {
+  margin: 0 0 4px;
+}
+
+.team-member-name {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+  text-transform: capitalize;
+}
+
+.team-member-number {
+  font-size: 0.85rem;
+}
+
+.team-member-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-member-types li {
+  padding: 0 8px;
+  border: 1px solid #8886;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.team-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

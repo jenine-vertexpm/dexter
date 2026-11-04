@@ -9,5 +9,7 @@ afterEach(() => {
   server.resetHandlers()
   // Testing Library only cleans up automatically when test globals are on; we import them explicitly instead
   cleanup()
+  // Saved teams from one test must not leak into the next
+  localStorage.clear()
 })
 afterAll(() => server.close())

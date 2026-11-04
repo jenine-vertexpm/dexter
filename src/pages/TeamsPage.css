@@ -1,0 +1,96 @@
+.storage-notice {
+  padding: 8px 12px;
+  border: 1px solid #c9a227;
+  border-radius: 8px;
+}
+
+.team-create {
+  margin-bottom: 24px;
+}
+
+/* Lets code move focus to the heading after a delete, without a focus ring on a non-control */
+.team-list-heading:focus {
+  outline: none;
+}
+
+.team-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Field and buttons on one line when there's room; they wrap at 360px */
+.team-name-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-name-form input {
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 320px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.field-error {
+  margin: 0;
+  color: #c62828;
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .field-error {
+    color: #ff8a80;
+  }
+}
+
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #8884;
+  border-radius: 8px;
+}
+
+.team-row-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  /* Long team names wrap instead of pushing the row wider than the screen */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.team-row-name {
+  font-weight: 600;
+}
+
+.team-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-row-confirm p {
+  margin: 0 0 8px;
+}

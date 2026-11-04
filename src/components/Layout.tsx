@@ -1,6 +1,7 @@
-import { Link, Outlet } from 'react-router'
+import { Link, NavLink, Outlet } from 'react-router'
 
-// The frame around every page: a header with a link home, then the current page in <main>.
+// The frame around every page: a header with a link home and the main links, then the
+// current page in <main>.
 // <Outlet /> is where React Router puts the page that matches the URL.
 export function Layout() {
   return (
@@ -9,6 +10,10 @@ export function Layout() {
         <Link to="/" className="site-title">
           Dexter
         </Link>
+        {/* NavLink is a Link that adds aria-current="page" when its page is the one showing */}
+        <nav aria-label="Main" className="site-nav">
+          <NavLink to="/teams">Teams</NavLink>
+        </nav>
       </header>
       <main className="site-main">
         <Outlet />

@@ -19,6 +19,7 @@ export function TeamNameForm({
   onCancel,
   focusOnMount = false,
   clearAfterSubmit = false,
+  disabled = false,
 }: {
   label: string
   submitLabel: string
@@ -31,6 +32,9 @@ export function TeamNameForm({
   onCancel?: () => void
   focusOnMount?: boolean
   clearAfterSubmit?: boolean
+  // Turns off the field and the submit button, e.g. while saved teams wait for a recovery
+  // choice (plan §4.1). Cancel stays usable, so the user can always back out.
+  disabled?: boolean
 }) {
   // useId gives ids that are unique on the page, so several forms can be shown at once
   const id = useId()
@@ -85,11 +89,14 @@ export function TeamNameForm({
           type="text"
           autoComplete="off"
           value={name}
+          disabled={disabled}
           onChange={(event) => changeName(event.target.value)}
           aria-invalid={error !== null}
           aria-describedby={error === null ? hintId : `${hintId} ${errorId}`}
         />
-        <button type="submit">{submitLabel}</button>
+        <button type="submit" disabled={disabled}>
+          {submitLabel}
+        </button>
         {onCancel && (
           <button type="button" onClick={onCancel}>
             Cancel

@@ -10,7 +10,9 @@ import './TeamsPage.css'
 // /teams: create, rename and delete teams (M3 plan T4), with any storage problem explained
 // above them (T5)
 export function TeamsPage() {
-  const { teams, createTeam } = useTeams()
+  // savingPaused: saved teams are waiting for a recovery choice in the storage notice, so every
+  // control that changes teams is disabled until then (plan §4.1). The notice says why.
+  const { teams, createTeam, savingPaused } = useTeams()
   // Read out by screen readers after a change, e.g. "Deleted 'Rain team'."
   const [announcement, setAnnouncement] = useState('')
   // After a delete the team's row is gone, so focus moves to the list heading instead of being lost
@@ -46,6 +48,7 @@ export function TeamsPage() {
           check={checkNewName}
           submit={create}
           clearAfterSubmit
+          disabled={savingPaused}
         />
       </section>
 
@@ -89,7 +92,7 @@ function TeamRow({
   onRenamed: (name: string) => void
   onDeleted: (name: string) => void
 }) {
-  const { teams, renameTeam, deleteTeam } = useTeams()
+  const { teams, renameTeam, deleteTeam, savingPaused } = useTeams()
   const [mode, setMode] = useState<'view' | 'rename' | 'confirm-delete'>('view')
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -142,6 +145,7 @@ function TeamRow({
           submit={rename}
           onCancel={() => show('view', 'rename')}
           focusOnMount
+          disabled={savingPaused}
         />
       </li>
     )
@@ -165,6 +169,7 @@ function TeamRow({
             ref={renameButton}
             type="button"
             aria-label={`Rename ${team.name}`}
+            disabled={savingPaused}
             onClick={() => show('rename', null)}
           >
             Rename
@@ -173,6 +178,7 @@ function TeamRow({
             ref={deleteButton}
             type="button"
             aria-label={`Delete ${team.name}`}
+            disabled={savingPaused}
             onClick={() => show('confirm-delete', 'cancel-delete')}
           >
             Delete
@@ -183,7 +189,7 @@ function TeamRow({
         <div className="team-row-confirm">
           <p>Delete '{team.name}'? This can't be undone.</p>
           <div className="team-row-actions">
-            <button type="button" onClick={confirmDelete}>
+            <button type="button" onClick={confirmDelete} disabled={savingPaused}>
               Yes, delete
             </button>
             <button ref={cancelDeleteButton} type="button" onClick={() => show('view', 'delete')}>

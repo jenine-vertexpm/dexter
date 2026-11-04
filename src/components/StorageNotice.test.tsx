@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.tsx'
@@ -7,12 +7,12 @@ import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
 import { detailHandlers, listHandlers } from '../test/handlers.ts'
 import { renderWithProviders } from '../test/render.tsx'
 import { server } from '../test/server.ts'
-import { SAVING_PAUSED_MESSAGE } from '../teams/teamsReducer.ts'
 import { SAVED_DATA_FILENAME } from './StorageNotice.tsx'
 
 const ID_RAIN = '6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
 const ID_SUN = '0a9b8c7d-6e5f-4a3b-8c1d-2e3f4a5b6c7d'
 const RAIN: Team = { id: ID_RAIN, name: 'Rain team', members: [{ species: 'eevee', nickname: null }] }
+const SUN: Team = { id: ID_SUN, name: 'Sun team', members: [] }
 
 // What can be found in storage. Each is stored as-is, exactly as a person or another app left it.
 // One valid team and one with an empty name, which can't be read
@@ -95,9 +95,10 @@ describe('StorageNotice: a notice for each storage status', () => {
     expect(
       screen.getByText("Couldn't save your latest change (storage full). Export your teams to keep a copy."),
     ).toBeInTheDocument()
-    // The change is kept in memory, not thrown away
+    // The change is kept in memory, not thrown away, and teams can still be changed
     expect(screen.getByRole('link', { name: 'Sun team' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Rain team' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled()
   })
 
   it('shows no notice when storage is working', () => {
@@ -107,37 +108,83 @@ describe('StorageNotice: a notice for each storage status', () => {
   })
 })
 
-describe('StorageNotice: the original is never overwritten while waiting for a choice', () => {
+describe('StorageNotice: team controls are disabled while waiting for a choice', () => {
   it.each([
     ['salvaged', SALVAGED],
     ['unreadable', UNREADABLE],
     ['newer-version', NEWER_VERSION],
-  ])('%s: creating a team is refused with a message, and storage is unchanged', async (_, text) => {
+  ])('%s: the create form is disabled, and storage is unchanged', async (_, text) => {
     const user = userEvent.setup()
     renderAt('/teams', text)
 
+    expect(screen.getByLabelText('Team name')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Create team' })).toBeDisabled()
+    // Typing into a disabled field does nothing, so nothing can be submitted
     await user.type(screen.getByLabelText('Team name'), 'Hail team{Enter}')
-
-    expect(screen.getByText(SAVING_PAUSED_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hail team' })).not.toBeInTheDocument()
     expect(stored()).toBe(text)
   })
 
-  it('salvaged: renaming and deleting a shown team are refused too', async () => {
+  it('salvaged: Rename and Delete are disabled on the teams that are shown', async () => {
     const user = userEvent.setup()
     renderAt('/teams', SALVAGED)
 
-    await user.click(screen.getByRole('button', { name: 'Rename Rain team' }))
-    await user.type(screen.getByLabelText("New name for 'Rain team'"), ' 2{Enter}')
-    expect(screen.getByText(SAVING_PAUSED_MESSAGE)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
+    expect(screen.getByRole('button', { name: 'Rename Rain team' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete Rain team' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Delete Rain team' }))
-    await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
-    expect(screen.getByText(SAVING_PAUSED_MESSAGE)).toBeInTheDocument()
-
-    expect(screen.getByRole('link', { name: 'Rain team' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Yes, delete' })).not.toBeInTheDocument()
+    // The recovery buttons themselves stay usable
+    expect(screen.getByRole('button', { name: 'Keep the valid teams' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Download original data' })).toBeEnabled()
     expect(stored()).toBe(SALVAGED)
+  })
+
+  it('a rename or delete already open when saving pauses can no longer be confirmed, only cancelled', async () => {
+    const user = userEvent.setup()
+    renderAt('/teams', [RAIN, SUN])
+    await user.click(screen.getByRole('button', { name: 'Rename Rain team' }))
+    await user.click(screen.getByRole('button', { name: 'Delete Sun team' }))
+
+    // Another tab saves both teams plus one that can't be read (D17): saving pauses here,
+    // while both teams stay on screen
+    const fromOtherTab = JSON.stringify({ version: 1, teams: [RAIN, SUN, { id: 'bad' }] })
+    act(() => {
+      localStorage.setItem(TEAMS_STORAGE_KEY, fromOtherTab)
+      window.dispatchEvent(new StorageEvent('storage', { key: TEAMS_STORAGE_KEY, newValue: fromOtherTab }))
+    })
+
+    expect(screen.getByLabelText("New name for 'Rain team'")).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Yes, delete' })).toBeDisabled()
+    // Both Cancel buttons (rename and delete) still work
+    const cancels = screen.getAllByRole('button', { name: 'Cancel' })
+    expect(cancels).toHaveLength(2)
+    for (const cancel of cancels) expect(cancel).toBeEnabled()
+    await user.click(cancels[0])
+    expect(screen.getByRole('button', { name: 'Rename Rain team' })).toBeDisabled()
+    expect(stored()).toBe(fromOtherTab)
+  })
+
+  it('controls are enabled again once a choice is made', async () => {
+    const user = userEvent.setup()
+    renderAt('/teams', SALVAGED)
+
+    await user.click(screen.getByRole('button', { name: 'Keep the valid teams' }))
+
+    expect(screen.getByLabelText('Team name')).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Rename Rain team' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Delete Rain team' })).toBeEnabled()
+  })
+
+  it('unavailable: controls stay enabled, because teams still work in memory', () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Blocked', 'SecurityError')
+    })
+    renderAt('/teams')
+
+    expect(screen.getByLabelText('Team name')).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled()
   })
 })
 

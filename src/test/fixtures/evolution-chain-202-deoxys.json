@@ -1,0 +1,11 @@
+{
+  "id": 202,
+  "chain": {
+    "is_baby": false,
+    "species": {
+      "name": "deoxys",
+      "url": "https://pokeapi.co/api/v2/pokemon-species/386/"
+    },
+    "evolves_to": []
+  }
+}

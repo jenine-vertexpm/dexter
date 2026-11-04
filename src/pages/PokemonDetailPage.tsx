@@ -1,9 +1,11 @@
 import { useParams } from 'react-router'
 import { ApiError } from '../api/client.ts'
+import { AddToTeamButton } from '../components/AddToTeamButton.tsx'
 import { ErrorMessage } from '../components/ErrorMessage.tsx'
 import { EvolutionChain } from '../components/EvolutionChain.tsx'
 import { SpeciesNav } from '../components/SpeciesNav.tsx'
 import { StatBars } from '../components/StatBars.tsx'
+import { TeamPicker } from '../components/TeamPicker.tsx'
 import { TypeMatchups } from '../components/TypeMatchups.tsx'
 import { formatName, formatPokemonNumber } from '../domain/format.ts'
 import { defaultVarietyName, toPokemonDetail, type PokemonDetail } from '../domain/pokemon.ts'
@@ -59,6 +61,12 @@ function PokemonDetails({ detail }: { detail: PokemonDetail }) {
             <li key={type}>{type}</li>
           ))}
         </ul>
+      </div>
+
+      {/* Add this Pokémon to a team (M3 plan T7) */}
+      <div className="detail-add-to-team">
+        <TeamPicker />
+        <AddToTeamButton species={detail.name} />
       </div>
 
       <div className="detail-columns">

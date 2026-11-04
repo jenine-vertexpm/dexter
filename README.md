@@ -46,5 +46,5 @@ Then open the address it prints (usually http://localhost:5173) in your browser.
 This project was built for a two-week AI-assisted React engineering challenge; the brief itself is not included in this repository.
 
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) – decision log
-  - **To do:** six M2 entries still have `TODO` fields to be filled in, in the author's own words (search the file for "TODO").
+  
 - [`docs/plans/M2.md`](docs/plans/M2.md) – M2 plan: browse and detail

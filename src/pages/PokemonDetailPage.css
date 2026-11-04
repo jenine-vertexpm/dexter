@@ -164,6 +164,49 @@
   font-weight: 700;
 }
 
+/* Type matchups: a two-column table, narrow enough for 360px */
+.matchup-table {
+  width: 100%;
+  max-width: 320px;
+  border-collapse: collapse;
+}
+
+.matchup-table caption {
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.matchup-table th,
+.matchup-table td {
+  padding: 2px 8px;
+  border-bottom: 1px solid #8883;
+  text-align: left;
+}
+
+.matchup-type {
+  font-weight: 400;
+  text-transform: capitalize;
+}
+
+/* Colour is only a hint: the cell's text always gives the multiplier */
+.matchup-table td {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.matchup-weak {
+  background: #e5484d33;
+}
+
+.matchup-resist {
+  background: #30a46c33;
+}
+
+.matchup-immune {
+  background: #8886;
+}
+
 .species-nav {
   display: flex;
   flex-wrap: wrap;

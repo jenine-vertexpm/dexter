@@ -5,6 +5,8 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from '../App.tsx'
+import { BATTLE_TYPES } from '../domain/battleTypes.ts'
+import typeNormal from '../test/fixtures/type-normal.json'
 import { API, detailHandlers } from '../test/handlers.ts'
 import { renderWithProviders } from '../test/render.tsx'
 import { server } from '../test/server.ts'
@@ -289,6 +291,104 @@ describe('evolution chain', () => {
     await user.click(within(alert).getByRole('button', { name: 'Retry loading the evolution chain' }))
 
     expect(describeChain(await findChain('eevee'))).toMatch(/^eevee > \(vaporeon/)
+    expect(within(section()).queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('type matchups', () => {
+  const section = () => screen.getByRole('region', { name: 'Type matchups' })
+
+  // Waits for the table, then reads it as [attacking type, multiplier text] rows, in order
+  async function findMatchups(): Promise<[string, string][]> {
+    const table = await within(await screen.findByRole('region', { name: 'Type matchups' })).findByRole('table')
+    const bodyRows = within(table).getAllByRole('row').slice(1) // the first row is the header
+    return bodyRows.map((row) => [
+      within(row).getByRole('rowheader').textContent ?? '',
+      within(row).getByRole('cell').textContent ?? '',
+    ])
+  }
+  const asObject = (rows: [string, string][]) => Object.fromEntries(rows)
+
+  it('shows a single-type Pokémon’s matchups (eevee, normal)', async () => {
+    renderDetail('/pokemon/eevee')
+    const matchups = asObject(await findMatchups())
+
+    // From the real normal type: 2× from fighting, nothing from ghost, 1× from the rest
+    expect(matchups.fighting).toBe('2×')
+    expect(matchups.ghost).toBe('0×')
+    const others = Object.entries(matchups).filter(([type]) => type !== 'fighting' && type !== 'ghost')
+    expect(others).toHaveLength(16)
+    others.forEach(([, value]) => expect(value).toBe('1×'))
+  })
+
+  it('combines both types of a dual-type Pokémon (scizor, bug/steel): 4×, ¼× and 0×', async () => {
+    renderDetail('/pokemon/scizor')
+    const matchups = asObject(await findMatchups())
+
+    expect(matchups.fire).toBe('4×') // bug 2× and steel 2×
+    expect(matchups.grass).toBe('¼×') // bug ½× and steel ½×
+    expect(matchups.poison).toBe('0×') // steel is immune
+    expect(matchups.fighting).toBe('1×') // bug ½× and steel 2× cancel out
+  })
+
+  it('lists exactly the 18 battle types, in order', async () => {
+    renderDetail('/pokemon/scizor')
+    const rows = await findMatchups()
+
+    expect(rows).toHaveLength(18)
+    expect(rows.map(([type]) => type)).toEqual([...BATTLE_TYPES])
+  })
+
+  it('never shows stellar, shadow or unknown, even if PokéAPI lists them', async () => {
+    // A normal type whose damage relations also name the three non-battle types
+    const extras = ['stellar', 'shadow', 'unknown'].map((name) => ({ name, url: `${API}/type/${name}/` }))
+    const normalWithExtras = {
+      ...typeNormal,
+      damage_relations: {
+        ...typeNormal.damage_relations,
+        double_damage_from: [...typeNormal.damage_relations.double_damage_from, ...extras],
+      },
+    }
+    server.use(http.get(`${API}/type/normal`, () => HttpResponse.json(normalWithExtras)))
+    renderDetail('/pokemon/eevee')
+
+    const rows = await findMatchups()
+
+    expect(rows).toHaveLength(18)
+    expect(within(section()).queryByText(/stellar|shadow|unknown/i)).not.toBeInTheDocument()
+  })
+
+  it('shows its own loading message while the rest of the page is already shown', async () => {
+    server.use(
+      http.get(`${API}/type/:name`, async () => {
+        await delay('infinite')
+        return new HttpResponse(null, { status: 500 })
+      }),
+    )
+    renderDetail('/pokemon/eevee')
+    await findTitle('eevee')
+
+    expect(await within(section()).findByRole('status')).toHaveTextContent('Loading type matchups…')
+    expect(screen.getByRole('meter', { name: 'HP' })).toBeInTheDocument()
+  })
+
+  it('shows an error with a retry inside the section, keeps the rest of the page, and loads on retry', async () => {
+    // Steel fails once; bug loads. Retry asks again only for what failed.
+    server.use(http.get(`${API}/type/steel`, () => new HttpResponse(null, { status: 500 }), { once: true }))
+    const user = userEvent.setup()
+    renderDetail('/pokemon/scizor')
+    await findTitle('scizor')
+
+    const alert = await within(section()).findByRole('alert')
+    expect(alert).toHaveTextContent('Could not load the type matchups. PokéAPI had a problem (error 500).')
+    // The rest of the page is unaffected
+    expect(screen.getByRole('img', { name: 'Official artwork of scizor' })).toBeInTheDocument()
+    expect(screen.getByRole('meter', { name: 'HP' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Abilities' })).toBeInTheDocument()
+
+    await user.click(within(alert).getByRole('button', { name: 'Retry loading the type matchups' }))
+
+    expect(asObject(await findMatchups()).fire).toBe('4×')
     expect(within(section()).queryByRole('alert')).not.toBeInTheDocument()
   })
 })

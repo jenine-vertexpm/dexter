@@ -4,11 +4,22 @@ import { Link, useSearchParams } from 'react-router'
 import { ErrorMessage } from '../components/ErrorMessage.tsx'
 import { Pagination } from '../components/Pagination.tsx'
 import { PokemonCard } from '../components/PokemonCard.tsx'
+import { TypeFilter } from '../components/TypeFilter.tsx'
+import type { BattleType } from '../domain/battleTypes.ts'
 import { MAX_SEARCH_LENGTH, parseListParams, toListParams, type ListState } from '../domain/listParams.ts'
-import { queryList, toSpeciesEntries } from '../domain/speciesList.ts'
-import { useSpeciesIndex } from '../queries/pokeApiQueries.ts'
+import { queryList, speciesIdsWithType, toSpeciesEntries } from '../domain/speciesList.ts'
+import { useSpeciesIndex, useTypes } from '../queries/pokeApiQueries.ts'
 import './PokemonListPage.css'
 const linkToState = (state: ListState) => ({ search: toListParams(state).toString() })
+
+// The "nothing matches" message names the search and the types in use
+function noMatchMessage(search: string, types: readonly BattleType[]): string {
+  const typeText = types.length === 0 ? '' : `the ${types.length === 1 ? 'type' : 'types'} ${types.join(' and ')}`
+  if (search === '' && typeText === '') return 'No Pokémon found.'
+  if (typeText === '') return `No Pokémon match '${search}'`
+  if (search === '') return `No Pokémon have ${typeText}.`
+  return `No Pokémon match '${search}' with ${typeText}.`
+}
 
 export function PokemonListPage() {
   // read the URL’s query parameters, convert them to a safe list state, and request the species index. The URL is intended to be the source of truth for page, search, and filters.
@@ -24,10 +35,24 @@ export function PokemonListPage() {
   }
   const searchText = state.search.trim()
 
+  // Ticking or unticking a type adds a history entry, so Back undoes it, and goes back to page 1 (D6)
+  function changeTypes(types: BattleType[]) {
+    setSearchParams(toListParams({ ...state, types, page: 1 }))
+  }
+
   // turn the API’s index into entries with IDs and names. useMemo avoids repeating that conversion unless the index data changes.
   const entries = useMemo(() => (index.data ? toSpeciesEntries(index.data) : []), [index.data])
+
+  // One request per chosen type, cached like everything else. Each type becomes the set of species
+  // that have it. The list is only shown once every chosen type has loaded, so it never shows
+  // Pokémon that the filter would remove.
+  const typeResults = useTypes(state.types)
+  const typeData = typeResults.flatMap((type) => (type.data ? [type.data] : []))
+  const listReady = index.isSuccess && typeData.length === state.types.length
+  const speciesIds = useMemo(() => new Set(entries.map((entry) => entry.id)), [entries])
+  const typeFilters = typeData.map((type) => speciesIdsWithType(type, speciesIds))
   // 
-  const result = queryList(entries, { search: state.search, typeFilters: [], page: state.page })
+  const result = queryList(listReady ? entries : [], { search: state.search, typeFilters, page: state.page })
 
   return (
     <>
@@ -44,15 +69,25 @@ export function PokemonListPage() {
           onChange={(event) => changeSearch(event.target.value)}
         />
       </div>
+      <TypeFilter selected={state.types} onChange={changeTypes} />
       {index.isPending && <p role="status">Loading Pokémon…</p>}
       {index.isError && (
         <ErrorMessage error={index.error} onRetry={() => void index.refetch()} what="the Pokémon list" />
       )}
-      {/* React shows the search as plain text, so typed markup is never treated as HTML */}
-      {index.isSuccess && result.total === 0 && (
-        <p>{searchText === '' ? 'No Pokémon found.' : `No Pokémon match '${searchText}'`}</p>
+      {typeResults.some((type) => type.isPending) && <p role="status">Loading types…</p>}
+      {typeResults.map((type, i) =>
+        type.isError ? (
+          <ErrorMessage
+            key={state.types[i]}
+            error={type.error}
+            onRetry={() => void type.refetch()}
+            what={`the ${state.types[i]} type`}
+          />
+        ) : null,
       )}
-      {index.isSuccess && result.total > 0 && result.items.length === 0 && (
+      {/* React shows the search as plain text, so typed markup is never treated as HTML */}
+      {listReady && result.total === 0 && <p>{noMatchMessage(searchText, state.types)}</p>}
+      {listReady && result.total > 0 && result.items.length === 0 && (
         <p>
           Page {state.page} does not exist. There {result.totalPages === 1 ? 'is' : 'are'} only {result.totalPages}{' '}
           {result.totalPages === 1 ? 'page' : 'pages'}. <Link to={linkToState({ ...state, page: 1 })}>Go to page 1</Link>

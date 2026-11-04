@@ -1,4 +1,4 @@
-import { queryOptions, useQuery } from '@tanstack/react-query'
+import { queryOptions, useQueries, useQuery } from '@tanstack/react-query'
 import {
   ApiError,
   getEvolutionChain,
@@ -106,4 +106,10 @@ export function useEvolutionChain(id: number | null) {
 
 export function useType(name: string) {
   return useQuery(typeQuery(name))
+}
+
+// Several types at once, one result per name in the same order: the list's type filter (0–2
+// types), and a Pokémon's own 1–2 types for its matchups. Shares the cache with useType.
+export function useTypes(names: readonly string[]) {
+  return useQueries({ queries: names.map((name) => typeQuery(name)) })
 }

@@ -7,44 +7,6 @@
   outline: none;
 }
 
-.team-name-form {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Field and buttons on one line when there's room; they wrap at 360px */
-.team-name-form-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.team-name-form input {
-  flex: 1 1 200px;
-  min-width: 0;
-  max-width: 320px;
-  padding: 6px 8px;
-  font: inherit;
-}
-
-.field-hint {
-  margin: 0;
-  font-size: 0.85rem;
-}
-
-.field-error {
-  margin: 0;
-  color: #c62828;
-  font-weight: 600;
-}
-
-@media (prefers-color-scheme: dark) {
-  .field-error {
-    color: #ff8a80;
-  }
-}
-
 .team-list {
   display: flex;
   flex-direction: column;

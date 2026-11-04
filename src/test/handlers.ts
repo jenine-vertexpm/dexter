@@ -4,10 +4,14 @@ import chainOddish from './fixtures/evolution-chain-18-oddish.json'
 import chainDeoxys from './fixtures/evolution-chain-202-deoxys.json'
 import chainEevee from './fixtures/evolution-chain-67-eevee.json'
 import pokemonEevee from './fixtures/pokemon-133-eevee.json'
+import pokemonScizor from './fixtures/pokemon-212-scizor.json'
 import pokemonDeoxysNormal from './fixtures/pokemon-386-deoxys-normal.json'
 import speciesDeoxys from './fixtures/species-deoxys.json'
 import speciesEevee from './fixtures/species-eevee.json'
 import speciesIndex from './fixtures/species-index.json'
+import typeBug from './fixtures/type-bug.json'
+import typeNormal from './fixtures/type-normal.json'
+import typeSteel from './fixtures/type-steel.json'
 
 export const API = 'https://pokeapi.co/api/v2'
 
@@ -65,7 +69,12 @@ export function fakeSpecies(id: number, name: string, chainId: number | null = n
 
 // Real responses for the detail page tests, by name or chain id
 const REAL_SPECIES: Record<string, unknown> = { deoxys: speciesDeoxys, eevee: speciesEevee }
-const REAL_POKEMON: Record<string, unknown> = { 'deoxys-normal': pokemonDeoxysNormal, eevee: pokemonEevee }
+const REAL_POKEMON: Record<string, unknown> = {
+  'deoxys-normal': pokemonDeoxysNormal,
+  eevee: pokemonEevee,
+  scizor: pokemonScizor,
+}
+const REAL_TYPES: Record<string, unknown> = { bug: typeBug, normal: typeNormal, steel: typeSteel }
 const REAL_CHAINS = [chainBulbasaur, chainOddish, chainEevee, chainDeoxys]
 const indexIdByName = new Map([...indexNameById].map(([id, name]) => [name, id]))
 
@@ -82,7 +91,7 @@ function addChainMembers(link: FixtureChainLink, chainId: number) {
 REAL_CHAINS.forEach((chain) => addChainMembers(chain.chain, chain.id))
 
 // Answers the requests the detail page makes: a species by name, a Pokémon by name, an
-// evolution chain by id, and the species index (for previous/next). Deoxys and Eevee are real
+// evolution chain by id, a type by name (for matchups), and the species index (for previous/next). Deoxys and Eevee are real
 // responses; any other species in the fixture index gets a fake one. Anything else is a 404,
 // like PokéAPI.
 export function detailHandlers() {
@@ -98,6 +107,10 @@ export function detailHandlers() {
     http.get(`${API}/evolution-chain/:id`, ({ params }) => {
       const chain = REAL_CHAINS.find((candidate) => candidate.id === Number(params.id))
       return chain ? HttpResponse.json(chain) : new HttpResponse(null, { status: 404 })
+    }),
+    http.get(`${API}/type/:name`, ({ params }) => {
+      const type = REAL_TYPES[String(params.name)]
+      return type ? HttpResponse.json(type) : new HttpResponse(null, { status: 404 })
     }),
     http.get(`${API}/pokemon/:name`, ({ params }) => {
       const name = String(params.name)

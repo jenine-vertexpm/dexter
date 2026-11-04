@@ -217,7 +217,8 @@ export function addMember(teams: Team[], teamId: string, species: string): Teams
     return fail(`${formatName(species)} is already in '${team.name}'.`)
   }
   if (team.members.length >= MAX_TEAM_SIZE) {
-    return fail(`'${team.name}' is full: a team can have at most ${MAX_TEAM_SIZE} Pokémon.`)
+    // Wording from the M3 plan (T7): "Rain team is full (6 of 6)"
+    return fail(`${team.name} is full (${team.members.length} of ${MAX_TEAM_SIZE}).`)
   }
   const members = [...team.members, { species, nickname: null }]
   return { ok: true, value: replaceTeam(teams, { ...team, members }) }

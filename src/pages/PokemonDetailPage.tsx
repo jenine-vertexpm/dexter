@@ -4,6 +4,7 @@ import { ErrorMessage } from '../components/ErrorMessage.tsx'
 import { EvolutionChain } from '../components/EvolutionChain.tsx'
 import { SpeciesNav } from '../components/SpeciesNav.tsx'
 import { StatBars } from '../components/StatBars.tsx'
+import { TypeMatchups } from '../components/TypeMatchups.tsx'
 import { formatName, formatPokemonNumber } from '../domain/format.ts'
 import { defaultVarietyName, toPokemonDetail, type PokemonDetail } from '../domain/pokemon.ts'
 import { usePokemon, useSpecies } from '../queries/pokeApiQueries.ts'
@@ -113,6 +114,8 @@ function PokemonDetails({ detail }: { detail: PokemonDetail }) {
       {detail.evolutionChainId !== null && (
         <EvolutionChain chainId={detail.evolutionChainId} currentName={detail.name} />
       )}
+
+      <TypeMatchups types={detail.types} />
 
       <SpeciesNav id={detail.id} />
     </article>

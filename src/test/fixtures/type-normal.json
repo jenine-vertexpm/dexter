@@ -1,0 +1,73 @@
+{
+  "id": 1,
+  "name": "normal",
+  "damage_relations": {
+    "no_damage_to": [
+      {
+        "name": "ghost",
+        "url": "https://pokeapi.co/api/v2/type/8/"
+      }
+    ],
+    "half_damage_to": [
+      {
+        "name": "rock",
+        "url": "https://pokeapi.co/api/v2/type/6/"
+      },
+      {
+        "name": "steel",
+        "url": "https://pokeapi.co/api/v2/type/9/"
+      }
+    ],
+    "double_damage_to": [],
+    "no_damage_from": [
+      {
+        "name": "ghost",
+        "url": "https://pokeapi.co/api/v2/type/8/"
+      }
+    ],
+    "half_damage_from": [],
+    "double_damage_from": [
+      {
+        "name": "fighting",
+        "url": "https://pokeapi.co/api/v2/type/2/"
+      }
+    ]
+  },
+  "pokemon": [
+    {
+      "slot": 1,
+      "pokemon": {
+        "name": "pidgey",
+        "url": "https://pokeapi.co/api/v2/pokemon/16/"
+      }
+    },
+    {
+      "slot": 1,
+      "pokemon": {
+        "name": "pidgeotto",
+        "url": "https://pokeapi.co/api/v2/pokemon/17/"
+      }
+    },
+    {
+      "slot": 1,
+      "pokemon": {
+        "name": "pidgeot",
+        "url": "https://pokeapi.co/api/v2/pokemon/18/"
+      }
+    },
+    {
+      "slot": 1,
+      "pokemon": {
+        "name": "rattata",
+        "url": "https://pokeapi.co/api/v2/pokemon/19/"
+      }
+    },
+    {
+      "slot": 1,
+      "pokemon": {
+        "name": "meloetta-pirouette",
+        "url": "https://pokeapi.co/api/v2/pokemon/10018/"
+      }
+    }
+  ]
+}

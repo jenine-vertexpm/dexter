@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { formatName, formatPokemonNumber, formatStatName } from './format.ts'
+import { formatMultiplier, formatName, formatPokemonNumber, formatStatName } from './format.ts'
+import type { Multiplier } from './matchups.ts'
 
 describe('formatPokemonNumber', () => {
   it('pads the number to four digits', () => {
@@ -24,5 +25,18 @@ describe('formatStatName', () => {
 
   it('still gives an unexpected stat a readable label', () => {
     expect(formatStatName('new-stat')).toBe('new stat')
+  })
+})
+
+describe('formatMultiplier', () => {
+  it('writes every multiplier as text', () => {
+    expect([0, 0.25, 0.5, 1, 2, 4].map((value) => formatMultiplier(value as Multiplier))).toEqual([
+      '0×',
+      '¼×',
+      '½×',
+      '1×',
+      '2×',
+      '4×',
+    ])
   })
 })

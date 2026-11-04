@@ -17,4 +17,5 @@ Real PokéAPI responses, fetched on 2026-10-29 and trimmed so tests stay small a
 | `evolution-chain-67-eevee.json` | Branches at the first step (8 evolutions) |
 | `evolution-chain-18-oddish.json` | Branches at a later step (gloom → vileplume or bellossom) |
 | `evolution-chain-202-deoxys.json` | A species that does not evolve (a chain of one). Fetched 2026-11-04. |
+| `type-normal.json` | A single type: 2× from fighting, 0× from ghost. Fetched 2026-11-04. |
 | `type-bug.json`, `type-steel.json` | Together give 4× (fire), ¼× (grass) and 0× (poison) against Scizor |

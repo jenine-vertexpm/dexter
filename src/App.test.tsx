@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App.tsx'
-import { listHandlers } from './test/handlers.ts'
+import { detailHandlers, listHandlers } from './test/handlers.ts'
 import { renderWithProviders } from './test/render.tsx'
 import { server } from './test/server.ts'
 
@@ -24,10 +24,11 @@ describe('routes', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Pokémon' })).toBeInTheDocument()
   })
 
-  it('shows the detail page for /pokemon/:name, with the name from the URL', () => {
+  it('shows the detail page for /pokemon/:name, with the name from the URL', async () => {
+    server.use(...detailHandlers())
     renderAt('/pokemon/eevee')
 
-    expect(screen.getByRole('heading', { level: 1, name: 'eevee' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'eevee' })).toBeInTheDocument()
   })
 
   it.each(['/nope', '/pokemon', '/pokemon/eevee/extra'])('shows the not-found page for %s', (url) => {
@@ -47,7 +48,10 @@ describe('routes', () => {
 describe('navigation', () => {
   it('goes back to the list from the header link', async () => {
     const user = userEvent.setup()
+    // Detail handlers after list handlers, so they answer the detail page's requests first
+    server.use(...detailHandlers())
     renderAt('/pokemon/eevee')
+    await screen.findByRole('heading', { level: 1, name: 'eevee' })
 
     await user.click(screen.getByRole('link', { name: 'Dexter' }))
 

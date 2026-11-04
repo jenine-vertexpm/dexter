@@ -1,0 +1,150 @@
+.detail-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 16px;
+}
+
+.detail-name {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.detail-number {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.detail-types {
+  display: flex;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.detail-types li {
+  padding: 0 10px;
+  border: 1px solid #8886;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+/* One column on phones (artwork above the facts), two side by side from 640px */
+.detail-columns {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .detail-columns {
+    grid-template-columns: 240px 1fr;
+    align-items: start;
+  }
+}
+
+/* Shrinks on narrow screens but keeps its square shape, so space is reserved before it loads */
+.detail-artwork {
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  justify-self: center;
+}
+
+.detail-artwork-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #8882;
+}
+
+.detail-description {
+  margin-top: 0;
+}
+
+.detail-measurements {
+  display: flex;
+  gap: 24px;
+  margin: 0 0 16px;
+}
+
+.detail-measurements dt {
+  font-size: 0.85rem;
+}
+
+.detail-measurements dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.pokemon-detail h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.pokemon-detail section {
+  margin-bottom: 16px;
+}
+
+.detail-abilities {
+  margin: 0;
+  padding-left: 20px;
+  text-transform: capitalize;
+}
+
+.hidden-ability {
+  font-style: italic;
+  text-transform: none;
+}
+
+.stat-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Name | number | bar. The name column fits "Special Defense" and still leaves room at 360px. */
+.stat-row {
+  display: grid;
+  grid-template-columns: 8.5rem 2.5rem 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: #8883;
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  background: currentColor;
+}
+
+.species-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #8884;
+}
+
+.species-nav a {
+  text-transform: capitalize;
+}
+
+.species-nav-next {
+  margin-left: auto;
+}

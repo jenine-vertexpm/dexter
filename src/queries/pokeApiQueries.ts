@@ -87,8 +87,10 @@ export function useSpecies(name: string) {
   return useQuery(speciesQuery(name))
 }
 
-export function usePokemon(name: string) {
-  return useQuery(pokemonQuery(name))
+// Waits while name is null: the detail page only knows which Pokémon to load once its species has
+// loaded (species "deoxys" → Pokémon "deoxys-normal")
+export function usePokemon(name: string | null) {
+  return useQuery({ ...pokemonQuery(name ?? ''), enabled: name !== null })
 }
 
 export function usePokemonById(id: number) {

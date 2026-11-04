@@ -177,6 +177,122 @@ describe('content', () => {
   })
 })
 
+describe('evolution chain', () => {
+  const section = () => screen.getByRole('region', { name: 'Evolution chain' })
+  // Waits until the chain has loaded: its first species is shown as a link
+  const findChain = async (firstSpecies: string) => {
+    await within(await screen.findByRole('region', { name: 'Evolution chain' })).findByRole('link', {
+      name: firstSpecies,
+    })
+    return section()
+  }
+
+  // The tree as it is on screen, written compactly, e.g. "oddish > gloom > (vileplume | bellossom)".
+  // It is read from the nested lists, so it fails if a branch is shown as a straight line.
+  function describeList(list: Element): string {
+    const items = [...list.children]
+    const parts = items.map((item) => {
+      const name = item.querySelector(':scope > a')?.textContent ?? '?'
+      const next = item.querySelector(':scope > ul')
+      return next ? `${name} > ${describeList(next)}` : name
+    })
+    return parts.length === 1 ? (parts[0] ?? '') : `(${parts.join(' | ')})`
+  }
+  const describeChain = (chain: HTMLElement) => describeList(within(chain).getAllByRole('list')[0] as Element)
+
+  it('shows a linear chain as a line: bulbasaur → ivysaur → venusaur', async () => {
+    renderDetail('/pokemon/bulbasaur')
+
+    expect(describeChain(await findChain('bulbasaur'))).toBe('bulbasaur > ivysaur > venusaur')
+  })
+
+  it('shows all eight of Eevee’s evolutions as branches from Eevee', async () => {
+    renderDetail('/pokemon/eevee')
+    const chain = await findChain('eevee')
+
+    expect(describeChain(chain)).toBe(
+      'eevee > (vaporeon | jolteon | flareon | espeon | umbreon | leafeon | glaceon | sylveon)',
+    )
+    // Screen readers hear the same shape: a list with 1 item (eevee) that holds a list of 8
+    const [outer, branches] = within(chain).getAllByRole('list')
+    expect(outer?.children).toHaveLength(1)
+    expect(branches?.children).toHaveLength(8)
+  })
+
+  it('keeps a later branch in place: gloom evolves into vileplume or bellossom', async () => {
+    renderDetail('/pokemon/gloom')
+
+    expect(describeChain(await findChain('oddish'))).toBe('oddish > gloom > (vileplume | bellossom)')
+  })
+
+  it('links every species in the chain to its detail page', async () => {
+    renderDetail('/pokemon/eevee')
+    const links = within(await findChain('eevee')).getAllByRole('link')
+
+    const names = ['eevee', 'vaporeon', 'jolteon', 'flareon', 'espeon', 'umbreon', 'leafeon', 'glaceon', 'sylveon']
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(names.map((name) => `/pokemon/${name}`))
+  })
+
+  it('marks the Pokémon being viewed, and only that one', async () => {
+    renderDetail('/pokemon/gloom')
+    const chain = await findChain('oddish')
+
+    const current = within(chain).getByRole('link', { name: 'gloom' })
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(current.parentElement).toHaveTextContent(/^gloom \(this Pokémon\)/)
+    const others = within(chain)
+      .getAllByRole('link')
+      .filter((link) => link !== current)
+    others.forEach((link) => expect(link).not.toHaveAttribute('aria-current'))
+  })
+
+  it('goes to another species’ page from the chain', async () => {
+    const user = userEvent.setup()
+    renderDetail('/pokemon/gloom')
+
+    await user.click(within(await findChain('oddish')).getByRole('link', { name: 'bellossom' }))
+
+    await findTitle('bellossom')
+    expect(within(await findChain('oddish')).getByRole('link', { name: 'bellossom' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('shows its own loading message while the rest of the page is already shown', async () => {
+    server.use(
+      http.get(`${API}/evolution-chain/:id`, async () => {
+        await delay('infinite')
+        return new HttpResponse(null, { status: 500 })
+      }),
+    )
+    renderDetail('/pokemon/eevee')
+    await findTitle('eevee')
+
+    expect(await within(section()).findByRole('status')).toHaveTextContent('Loading evolution chain…')
+    expect(screen.getByRole('meter', { name: 'HP' })).toBeInTheDocument()
+  })
+
+  it('shows an error with a retry inside the section, keeps the rest of the page, and loads on retry', async () => {
+    server.use(http.get(`${API}/evolution-chain/:id`, () => new HttpResponse(null, { status: 500 }), { once: true }))
+    const user = userEvent.setup()
+    renderDetail('/pokemon/eevee')
+    await findTitle('eevee')
+
+    const alert = await within(section()).findByRole('alert')
+    expect(alert).toHaveTextContent('Could not load the evolution chain. PokéAPI had a problem (error 500).')
+    // The rest of the page is unaffected
+    expect(screen.getByRole('img', { name: 'Official artwork of eevee' })).toBeInTheDocument()
+    expect(screen.getByRole('meter', { name: 'HP' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Abilities' })).toBeInTheDocument()
+
+    await user.click(within(alert).getByRole('button', { name: 'Retry loading the evolution chain' }))
+
+    expect(describeChain(await findChain('eevee'))).toMatch(/^eevee > \(vaporeon/)
+    expect(within(section()).queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
 describe('previous and next', () => {
   const nav = () => screen.findByRole('navigation', { name: 'Previous and next Pokémon' })
 

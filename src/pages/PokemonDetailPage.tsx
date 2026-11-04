@@ -1,6 +1,7 @@
 import { useParams } from 'react-router'
 import { ApiError } from '../api/client.ts'
 import { ErrorMessage } from '../components/ErrorMessage.tsx'
+import { EvolutionChain } from '../components/EvolutionChain.tsx'
 import { SpeciesNav } from '../components/SpeciesNav.tsx'
 import { StatBars } from '../components/StatBars.tsx'
 import { formatName, formatPokemonNumber } from '../domain/format.ts'
@@ -107,6 +108,11 @@ function PokemonDetails({ detail }: { detail: PokemonDetail }) {
           </section>
         </div>
       </div>
+
+      {/* PokéAPI's docs don't promise every species has a chain; without one the section is left out */}
+      {detail.evolutionChainId !== null && (
+        <EvolutionChain chainId={detail.evolutionChainId} currentName={detail.name} />
+      )}
 
       <SpeciesNav id={detail.id} />
     </article>

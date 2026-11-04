@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App.tsx'
@@ -56,6 +56,18 @@ describe('navigation', () => {
     await user.click(screen.getByRole('link', { name: 'Dexter' }))
 
     expect(screen.getByRole('heading', { level: 1, name: 'Pokémon' })).toBeInTheDocument()
+  })
+
+  it('opens the Teams page from the header link', async () => {
+    const user = userEvent.setup()
+    renderAt('/')
+
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    await user.click(within(nav).getByRole('link', { name: 'Teams' }))
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
+    // NavLink marks the link to the page you're on
+    expect(within(nav).getByRole('link', { name: 'Teams' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('goes back to the list from the not-found page', async () => {

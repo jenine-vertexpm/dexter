@@ -8,7 +8,12 @@ import {
   getSpeciesIndex,
   getType,
 } from '../api/client.ts'
-import { belongsToSpecies, defaultVarietyName, toPokemonSummary } from '../domain/pokemon.ts'
+import {
+  belongsToSpecies,
+  defaultVarietyName,
+  toPokemonSummary,
+  type PokemonSummary,
+} from '../domain/pokemon.ts'
 import type { SpeciesEntry } from '../domain/speciesList.ts'
 
 // One query per PokéAPI endpoint. Each has a key (its address in TanStack Query's cache) and a
@@ -114,4 +119,41 @@ export function useType(name: string) {
 // types), and a Pokémon's own 1–2 types for its matchups. Shares the cache with useType.
 export function useTypes(names: readonly string[]) {
   return useQueries({ queries: names.map((name) => typeQuery(name)) })
+}
+
+// What a team member card needs to know about one species (M3 plan T6)
+export type TeamMemberData =
+  | { status: 'loading' }
+  // PokéAPI has no species by this name (e.g. it was edited by hand in storage)
+  | { status: 'not-found' }
+  | { status: 'error'; error: unknown; retry: () => void }
+  | { status: 'ready'; summary: PokemonSummary }
+
+// One team member's artwork, number and types. Teams only store the species name (decision D10),
+// so this loads the rest the same way the detail page does: the species, then its default
+// Pokémon (species "deoxys" → Pokémon "deoxys-normal"). Same queries, so the same cache: opening
+// a member's detail page afterwards needs no new requests, and the other way round.
+export function useTeamMember(speciesName: string): TeamMemberData {
+  const species = useSpecies(speciesName)
+  const varietyName = species.data ? defaultVarietyName(species.data) : null
+  const pokemon = usePokemon(varietyName)
+
+  if (species.error instanceof ApiError && species.error.kind === 'not-found') {
+    return { status: 'not-found' }
+  }
+  if (species.isError) {
+    return { status: 'error', error: species.error, retry: () => void species.refetch() }
+  }
+  if (species.data && varietyName === null) {
+    // PokéAPI says every species has a default Pokémon; this only happens if that ever stops being true
+    const error = new ApiError('invalid-response', `Species "${speciesName}" has no default Pokémon`)
+    return { status: 'error', error, retry: () => void species.refetch() }
+  }
+  if (pokemon.isError) {
+    return { status: 'error', error: pokemon.error, retry: () => void pokemon.refetch() }
+  }
+  if (species.data && pokemon.data) {
+    return { status: 'ready', summary: toPokemonSummary(pokemon.data, species.data.id) }
+  }
+  return { status: 'loading' }
 }

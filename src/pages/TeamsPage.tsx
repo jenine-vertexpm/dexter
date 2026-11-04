@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { StorageNotice } from '../components/StorageNotice.tsx'
-import { TeamNameForm } from '../components/TeamNameForm.tsx'
+import { TextFieldForm } from '../components/TextFieldForm.tsx'
 import * as rules from '../domain/team.ts'
-import { MAX_TEAM_SIZE, type Team } from '../domain/team.ts'
+import { MAX_TEAM_NAME_LENGTH, MAX_TEAM_SIZE, type Team } from '../domain/team.ts'
 import { useTeams } from '../teams/useTeams.ts'
 import './TeamsPage.css'
+
+const TEAM_NAME_HINT = `Up to ${MAX_TEAM_NAME_LENGTH} characters.`
 
 // /teams: create, rename and delete teams (M3 plan T4), with any storage problem explained
 // above them (T5)
@@ -42,8 +44,9 @@ export function TeamsPage() {
 
       <section className="team-create">
         <h2>Create a team</h2>
-        <TeamNameForm
+        <TextFieldForm
           label="Team name"
+          hint={TEAM_NAME_HINT}
           submitLabel="Create team"
           check={checkNewName}
           submit={create}
@@ -137,10 +140,11 @@ function TeamRow({
   if (mode === 'rename') {
     return (
       <li className="team-row">
-        <TeamNameForm
+        <TextFieldForm
           label={`New name for '${team.name}'`}
+          hint={TEAM_NAME_HINT}
           submitLabel="Save"
-          initialName={team.name}
+          initialValue={team.name}
           check={checkRename}
           submit={rename}
           onCancel={() => show('view', 'rename')}

@@ -1,15 +1,15 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import App from '../App.tsx'
 import type { Team } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
+import { detailHandlers } from '../test/handlers.ts'
 import { renderWithProviders } from '../test/render.tsx'
+import { server } from '../test/server.ts'
 
 const ID_RAIN = '6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
 const ID_SUN = '0a9b8c7d-6e5f-4a3b-8c1d-2e3f4a5b6c7d'
-// Shaped like a team id, but no team has it
-const ID_UNKNOWN = '11111111-2222-4333-8444-555555555555'
 
 const RAIN: Team = {
   id: ID_RAIN,
@@ -20,6 +20,11 @@ const RAIN: Team = {
   ],
 }
 const SUN: Team = { id: ID_SUN, name: 'Sun team', members: [] }
+
+// Opening a team page loads its members from the fake PokéAPI
+beforeEach(() => {
+  server.use(...detailHandlers())
+})
 
 // The whole app at `url`, so routes and the header are the real ones
 function renderAt(url: string, storedTeams?: Team[] | string) {
@@ -278,30 +283,4 @@ describe('TeamsPage: persistence', () => {
   })
 })
 
-describe('team routes', () => {
-  it('shows the team placeholder page with the team name', () => {
-    renderAt(`/teams/${ID_RAIN}`, [RAIN])
-
-    expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
-    expect(screen.getByText('2/6 Pokémon')).toBeInTheDocument()
-  })
-
-  it.each([
-    ['an unknown team id', `/teams/${ID_UNKNOWN}`],
-    ['a malformed team id', '/teams/abc'],
-    ['an extra path part', `/teams/${ID_RAIN}/extra`],
-  ])('shows the not-found page for %s', (_, url) => {
-    renderAt(url, [RAIN])
-
-    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
-  })
-
-  it('goes back to the Teams page from the team page', async () => {
-    const user = userEvent.setup()
-    renderAt(`/teams/${ID_RAIN}`, [RAIN])
-
-    await user.click(screen.getByRole('link', { name: 'Back to your teams' }))
-
-    expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
-  })
-})
+// The team page and its routes are tested in TeamDetailPage.test.tsx

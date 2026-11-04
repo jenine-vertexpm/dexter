@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ApiType } from '../api/schemas.ts'
 import speciesIndex from '../test/fixtures/species-index.json'
 import typeBug from '../test/fixtures/type-bug.json'
-import { PAGE_SIZE, queryList, speciesIdsWithType, toSpeciesEntries, type ListQuery } from './speciesList.ts'
+import { neighbours, PAGE_SIZE, queryList, speciesIdsWithType, toSpeciesEntries, type ListQuery } from './speciesList.ts'
 
 // The fixture index holds 46 real species: 1–30, the oddish and eevee families, scizor, deoxys, pecharunt…
 const entries = toSpeciesEntries(speciesIndex)
@@ -112,5 +112,20 @@ describe('queryList', () => {
     expect(names({ ...noFilter, search: 'pie', typeFilters: [bug] })).toEqual(['caterpie'])
     // "char" matches four species, none of them bug type
     expect(names({ ...noFilter, search: 'char', typeFilters: [bug] })).toEqual([])
+  })
+})
+
+describe('neighbours', () => {
+  it('gives the species before and after by number', () => {
+    expect(neighbours(entries, 25)).toEqual({ previous: { id: 24, name: 'arbok' }, next: { id: 26, name: 'raichu' } })
+  })
+
+  it('has no previous species for the first, and no next species for the last', () => {
+    expect(neighbours(entries, 1)).toEqual({ previous: null, next: { id: 2, name: 'ivysaur' } })
+    expect(neighbours(entries, 1025)).toEqual({ previous: { id: 700, name: 'sylveon' }, next: null })
+  })
+
+  it('has neither for a number that is not in the list', () => {
+    expect(neighbours(entries, 9999)).toEqual({ previous: null, next: null })
   })
 })

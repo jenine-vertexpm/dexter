@@ -30,6 +30,20 @@ export function speciesIdsWithType(type: ApiType, speciesIds: ReadonlySet<number
   return ids
 }
 
+export interface Neighbours {
+  previous: SpeciesEntry | null // null for the first species
+  next: SpeciesEntry | null // null for the last species
+}
+
+// The species just before and after this number, for the detail page's previous/next links.
+// `entries` must be sorted by number (toSpeciesEntries does that). Both are null if the number
+// is not in the list.
+export function neighbours(entries: readonly SpeciesEntry[], id: number): Neighbours {
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) return { previous: null, next: null }
+  return { previous: entries[index - 1] ?? null, next: entries[index + 1] ?? null }
+}
+
 export interface ListQuery {
   search: string
   // One set of species ids per chosen type (0, 1 or 2). A species must be in every set.

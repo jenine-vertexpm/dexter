@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router'
 import { ErrorMessage } from '../components/ErrorMessage.tsx'
 import { Pagination } from '../components/Pagination.tsx'
 import { PokemonCard } from '../components/PokemonCard.tsx'
+import { TeamPicker } from '../components/TeamPicker.tsx'
 import { TypeFilter } from '../components/TypeFilter.tsx'
 import type { BattleType } from '../domain/battleTypes.ts'
 import { MAX_SEARCH_LENGTH, parseListParams, toListParams, type ListState } from '../domain/listParams.ts'
@@ -70,6 +71,8 @@ export function PokemonListPage() {
         />
       </div>
       <TypeFilter selected={state.types} onChange={changeTypes} />
+      {/* Which team the cards' "Add to team" buttons add to (M3 plan T7) */}
+      <TeamPicker />
       {index.isPending && <p role="status">Loading Pokémon…</p>}
       {index.isError && (
         <ErrorMessage error={index.error} onRetry={() => void index.refetch()} what="the Pokémon list" />

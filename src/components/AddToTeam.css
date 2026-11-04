@@ -1,0 +1,46 @@
+/* TeamPicker and AddToTeamButton */
+
+.team-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 16px;
+}
+
+.team-picker select {
+  /* Shrinks to fit at 360px; long team names are cut off inside the box, not off the screen */
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.team-picker-note {
+  margin: 0;
+  flex-basis: 100%;
+}
+
+.add-to-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.add-to-team button {
+  max-width: 100%;
+  /* Long team names wrap onto a second line instead of widening the card */
+  overflow-wrap: anywhere;
+}
+
+/* No margin, so the empty live region takes no space until a result appears */
+.add-to-team-result {
+  margin: 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.add-to-team-link {
+  font-size: 0.85rem;
+}

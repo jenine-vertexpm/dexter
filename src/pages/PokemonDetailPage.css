@@ -223,3 +223,16 @@
 .species-nav-next {
   margin-left: auto;
 }
+
+.detail-add-to-team {
+  margin-bottom: 16px;
+}
+
+/* On this page the button lines up on the left with the picker, rather than centred like on a card */
+.detail-add-to-team .add-to-team {
+  align-items: flex-start;
+}
+
+.detail-add-to-team .team-picker {
+  margin-bottom: 8px;
+}

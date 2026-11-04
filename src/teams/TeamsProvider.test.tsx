@@ -146,7 +146,7 @@ describe('TeamsProvider: rule violations change nothing', () => {
     })
     expect(outcome).toEqual({
       ok: false,
-      message: "'Rain team' is full: a team can have at most 6 Pokémon.",
+      message: 'Rain team is full (6 of 6).',
     })
     expect(result.current.teams).toEqual([FULL])
     expect(stored()).toBe(before)

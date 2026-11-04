@@ -2,12 +2,14 @@ import { Link } from 'react-router'
 import { formatPokemonNumber } from '../domain/format.ts'
 import type { SpeciesEntry } from '../domain/speciesList.ts'
 import { usePokemonSummary } from '../queries/pokeApiQueries.ts'
+import { AddToTeamButton } from './AddToTeamButton.tsx'
 import { ErrorMessage } from './ErrorMessage.tsx'
 
 export const ARTWORK_SIZE = 120
 
 // One Pokémon in the list. Number and name are known from the species list straight away;
-// the artwork and types load separately for each card.
+// the artwork and types load separately for each card. The "Add to team" button sits beside the
+// link, not inside it: a button inside a link isn't allowed and confuses screen readers.
 export function PokemonCard({ entry }: { entry: SpeciesEntry }) {
   const { data, error, isPending, refetch } = usePokemonSummary(entry)
 
@@ -40,6 +42,7 @@ export function PokemonCard({ entry }: { entry: SpeciesEntry }) {
           ))}
         </ul>
       )}
+      <AddToTeamButton species={entry.name} />
     </article>
   )
 }

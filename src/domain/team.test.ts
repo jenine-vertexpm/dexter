@@ -248,7 +248,7 @@ describe('addMember', () => {
     expect(full[0].members).toEqual(members(...SIX))
 
     const result = addMember(full, ID_A, 'mewtwo')
-    expect(message(result)).toBe("'Rain team' is full: a team can have at most 6 Pokémon.")
+    expect(message(result)).toBe('Rain team is full (6 of 6).')
     expect(full[0].members).toEqual(members(...SIX))
   })
 

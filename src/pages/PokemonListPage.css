@@ -50,6 +50,10 @@
 }
 
 .pokemon-card {
+  /* A column, so the "Add to team" button can sit at the bottom of every card in a row */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   height: 100%;
   box-sizing: border-box;
   padding: 8px;
@@ -120,4 +124,10 @@
 
 .pagination > :last-child {
   justify-self: end;
+}
+
+/* Pushed to the bottom of the card, so the buttons line up across a row */
+.pokemon-card .add-to-team {
+  margin-top: auto;
+  padding-top: 4px;
 }

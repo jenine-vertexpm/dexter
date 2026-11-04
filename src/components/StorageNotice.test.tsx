@@ -1,6 +1,6 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.tsx'
 import type { Team } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
@@ -43,6 +43,11 @@ function stubDownloads() {
     },
   }
 }
+
+// Team pages load their members from the fake PokéAPI
+beforeEach(() => {
+  server.use(...detailHandlers())
+})
 
 afterEach(() => {
   vi.restoreAllMocks()

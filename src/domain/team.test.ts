@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addImportedTeam,
   addMember,
   createTeam,
   deleteTeam,
@@ -408,5 +409,33 @@ describe('newTeamId', () => {
     const ids = Array.from({ length: 50 }, newTeamId)
     for (const id of ids) expect(id).toMatch(UUID_SHAPE)
     expect(new Set(ids).size).toBe(50)
+  })
+})
+
+describe('addImportedTeam', () => {
+  const imported = { name: ' Sun team ', members: [{ species: 'eevee', nickname: 'Evie' }] }
+
+  it('adds the team at the end with the new id, a trimmed name and its members', () => {
+    expect(value(addImportedTeam([team()], imported, ID_B))).toEqual([
+      team(),
+      { id: ID_B, name: 'Sun team', members: [{ species: 'eevee', nickname: 'Evie' }] },
+    ])
+  })
+
+  it('rejects a name that clashes with an existing team, leaving the teams unchanged', () => {
+    const teams = [team()]
+    expect(message(addImportedTeam(teams, { ...imported, name: ' RAIN team ' }, ID_B))).toBe(
+      "A team called 'Rain team' already exists.",
+    )
+    expect(teams).toEqual([team()])
+  })
+
+  it('applies the member rules', () => {
+    const tooMany = { name: 'Big team', members: members(...SIX, 'mewtwo') }
+    expect(message(addImportedTeam([], tooMany, ID_B))).toBe('A team can have at most 6 Pokémon.')
+    const badNickname = { name: 'Odd', members: [{ species: 'eevee', nickname: 'Evie!' }] }
+    expect(message(addImportedTeam([], badNickname, ID_B))).toBe(
+      'Nickname can only contain letters, numbers and spaces.',
+    )
   })
 })

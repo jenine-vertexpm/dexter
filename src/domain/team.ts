@@ -274,3 +274,18 @@ export function setNickname(
   )
   return { ok: true, value: replaceTeam(teams, { ...team, members }) }
 }
+
+// Adds a team read from an imported file as a new team with a new id (M3 plan §4.2).
+// The same rules as everywhere else: createTeam checks the name and that it doesn't clash,
+// teamSchema checks the members. Existing teams are never replaced or changed.
+export function addImportedTeam(
+  teams: Team[],
+  imported: { name: string; members: TeamMember[] },
+  id: string = newTeamId(),
+): TeamsResult {
+  const created = createTeam(teams, imported.name, id)
+  if (!created.ok) return created
+  const parsed = teamSchema.safeParse({ id, name: imported.name, members: imported.members })
+  if (!parsed.success) return fail(firstMessage(parsed.error))
+  return { ok: true, value: [...teams, parsed.data] }
+}

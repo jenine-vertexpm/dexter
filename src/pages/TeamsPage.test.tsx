@@ -72,17 +72,7 @@ describe('TeamsPage: showing teams', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
   })
 
-  it('shows no storage notice when storage is working', () => {
-    renderAt('/teams', [RAIN])
-
-    expect(screen.queryByText(/saved teams|storage/i)).not.toBeInTheDocument()
-  })
-
-  it('shows a short storage notice when the saved teams could not be read', () => {
-    renderAt('/teams', 'not json')
-
-    expect(screen.getByText(/problem with your saved teams/)).toBeInTheDocument()
-  })
+  // Storage notices are tested in src/components/StorageNotice.test.tsx
 })
 
 describe('TeamsPage: creating a team', () => {

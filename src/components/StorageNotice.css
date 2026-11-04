@@ -1,0 +1,35 @@
+.storage-notice {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 2px solid #c9a227;
+  border-radius: 8px;
+}
+
+.storage-notice p {
+  margin: 0 0 8px;
+}
+
+.storage-notice p:last-child {
+  margin-bottom: 0;
+}
+
+.storage-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.storage-notice-actions:last-child {
+  margin-bottom: 0;
+}
+
+/* Moved to after a recovery action, so keyboard users keep their place; no ring on plain text */
+.storage-notice-done:focus {
+  outline: none;
+}
+
+.storage-notice h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}

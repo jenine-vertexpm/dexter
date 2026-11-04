@@ -1,37 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { StorageNotice } from '../components/StorageNotice.tsx'
 import { TeamNameForm } from '../components/TeamNameForm.tsx'
 import * as rules from '../domain/team.ts'
 import { MAX_TEAM_SIZE, type Team } from '../domain/team.ts'
-import type { StorageState } from '../teams/teamsReducer.ts'
 import { useTeams } from '../teams/useTeams.ts'
 import './TeamsPage.css'
 
-// A short line about storage when it isn't working normally. The full notices, with the
-// download and recovery buttons, come in T5.
-function storageNotice(storage: StorageState): string | null {
-  switch (storage.status) {
-    case 'ok':
-      return null
-    case 'unavailable':
-      return "Your browser is blocking storage, so your teams won't be saved after you close this tab."
-    case 'save-failed':
-      return "Couldn't save your latest change because browser storage is full."
-    case 'salvaged':
-    case 'unreadable':
-    case 'newer-version':
-      return "There's a problem with your saved teams, so changes are paused for now."
-  }
-}
-
-// /teams: create, rename and delete teams (M3 plan T4)
+// /teams: create, rename and delete teams (M3 plan T4), with any storage problem explained
+// above them (T5)
 export function TeamsPage() {
-  const { teams, storage, createTeam } = useTeams()
+  // savingPaused: saved teams are waiting for a recovery choice in the storage notice, so every
+  // control that changes teams is disabled until then (plan §4.1). The notice says why.
+  const { teams, createTeam, savingPaused } = useTeams()
   // Read out by screen readers after a change, e.g. "Deleted 'Rain team'."
   const [announcement, setAnnouncement] = useState('')
   // After a delete the team's row is gone, so focus moves to the list heading instead of being lost
   const listHeadingRef = useRef<HTMLHeadingElement>(null)
-  const notice = storageNotice(storage)
 
   // A "dry run" of the T1 rule: it works out the result without changing anything
   function checkNewName(name: string): string | null {
@@ -53,7 +38,7 @@ export function TeamsPage() {
   return (
     <>
       <h1>Teams</h1>
-      {notice !== null && <p className="storage-notice">{notice}</p>}
+      <StorageNotice />
 
       <section className="team-create">
         <h2>Create a team</h2>
@@ -63,6 +48,7 @@ export function TeamsPage() {
           check={checkNewName}
           submit={create}
           clearAfterSubmit
+          disabled={savingPaused}
         />
       </section>
 
@@ -106,7 +92,7 @@ function TeamRow({
   onRenamed: (name: string) => void
   onDeleted: (name: string) => void
 }) {
-  const { teams, renameTeam, deleteTeam } = useTeams()
+  const { teams, renameTeam, deleteTeam, savingPaused } = useTeams()
   const [mode, setMode] = useState<'view' | 'rename' | 'confirm-delete'>('view')
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -159,6 +145,7 @@ function TeamRow({
           submit={rename}
           onCancel={() => show('view', 'rename')}
           focusOnMount
+          disabled={savingPaused}
         />
       </li>
     )
@@ -182,6 +169,7 @@ function TeamRow({
             ref={renameButton}
             type="button"
             aria-label={`Rename ${team.name}`}
+            disabled={savingPaused}
             onClick={() => show('rename', null)}
           >
             Rename
@@ -190,6 +178,7 @@ function TeamRow({
             ref={deleteButton}
             type="button"
             aria-label={`Delete ${team.name}`}
+            disabled={savingPaused}
             onClick={() => show('confirm-delete', 'cancel-delete')}
           >
             Delete
@@ -200,7 +189,7 @@ function TeamRow({
         <div className="team-row-confirm">
           <p>Delete '{team.name}'? This can't be undone.</p>
           <div className="team-row-actions">
-            <button type="button" onClick={confirmDelete}>
+            <button type="button" onClick={confirmDelete} disabled={savingPaused}>
               Yes, delete
             </button>
             <button ref={cancelDeleteButton} type="button" onClick={() => show('view', 'delete')}>

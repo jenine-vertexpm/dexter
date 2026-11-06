@@ -1,0 +1,37 @@
+/* The team analysis table: 5 narrow columns, so it fits at 360px */
+.analysis-table {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 16px;
+  border-collapse: collapse;
+}
+
+.analysis-table caption {
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.analysis-table th,
+.analysis-table td {
+  padding: 2px 6px;
+  border-bottom: 1px solid #8883;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-type {
+  font-weight: 400;
+  text-transform: capitalize;
+}
+
+/* Colour is only a hint: the Note column says "Shared weakness" in words */
+.analysis-shared-weakness {
+  background: #e5484d33;
+  font-weight: 600;
+}
+
+/* Averages like "102.5" need a slightly wider number column than whole stats */
+.team-analysis .stat-row {
+  grid-template-columns: 8.5rem 3rem 1fr;
+}

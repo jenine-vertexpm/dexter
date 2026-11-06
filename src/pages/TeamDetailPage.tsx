@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { StorageNotice } from '../components/StorageNotice.tsx'
+import { TeamAnalysis } from '../components/TeamAnalysis.tsx'
 import { TeamMemberCard } from '../components/TeamMemberCard.tsx'
 import * as rules from '../domain/team.ts'
 import { MAX_TEAM_SIZE, teamIdSchema } from '../domain/team.ts'
@@ -126,6 +127,9 @@ export function TeamDetailPage() {
           ))}
         </ol>
       )}
+
+      {/* Its own loading, error and empty states, so it never holds up the members above (T8) */}
+      <TeamAnalysis species={members.map((member) => member.species)} />
 
       <p>
         <Link to="/teams">Back to your teams</Link>

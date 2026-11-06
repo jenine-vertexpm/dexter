@@ -11,7 +11,9 @@ import {
 import {
   belongsToSpecies,
   defaultVarietyName,
+  toPokemonDetail,
   toPokemonSummary,
+  type PokemonDetail,
   type PokemonSummary,
 } from '../domain/pokemon.ts'
 import type { SpeciesEntry } from '../domain/speciesList.ts'
@@ -156,4 +158,54 @@ export function useTeamMember(speciesName: string): TeamMemberData {
     return { status: 'ready', summary: toPokemonSummary(pokemon.data, species.data.id) }
   }
   return { status: 'loading' }
+}
+
+// Every member's details at once, for the team analysis (M3 plan T8)
+export type TeamPokemonData =
+  | { status: 'loading' }
+  | { status: 'error'; error: unknown; retry: () => void }
+  | { status: 'ready'; members: PokemonDetail[] }
+
+// The same queries as useTeamMember (species, then its default Pokémon) for all members, with
+// one combined state: ready only when every member has loaded.
+//
+// It only *reads* them: enabled: false means "watch this query in the cache, but never start a
+// request yourself". The team page's member cards (useTeamMember) do the loading. If both
+// started requests, one could join a request the other had just seen fail and quietly ask
+// again, so a card's error and Retry button might never appear. Retry here still works:
+// refetch() ignores `enabled`, and the card sees the new result through the shared cache.
+export function useTeamPokemon(speciesNames: readonly string[]): TeamPokemonData {
+  const species = useQueries({
+    queries: speciesNames.map((name) => ({ ...speciesQuery(name), enabled: false })),
+  })
+  // Only Pokémon whose species has loaded and named them. (Placeholder queries for the others
+  // would all share one key, which TanStack Query warns about.)
+  const varietyNames = species.flatMap((result) => {
+    const name = result.data ? defaultVarietyName(result.data) : null
+    return name === null ? [] : [name]
+  })
+  const pokemon = useQueries({
+    queries: varietyNames.map((name) => ({ ...pokemonQuery(name), enabled: false })),
+  })
+  const pokemonByName = new Map(varietyNames.map((name, i) => [name, pokemon[i]]))
+
+  const failed = [...species, ...pokemon].filter((result) => result.isError)
+  // Only the requests that failed are made again; loaded ones stay cached
+  const retry = () => failed.forEach((result) => void result.refetch())
+  if (failed.length > 0) {
+    return { status: 'error', error: failed[0]?.error, retry }
+  }
+  const missingVariety = species.findIndex((result) => result.data && defaultVarietyName(result.data) === null)
+  if (missingVariety !== -1) {
+    // As in useTeamMember: PokéAPI says this never happens
+    const error = new ApiError('invalid-response', `Species "${speciesNames[missingVariety]}" has no default Pokémon`)
+    return { status: 'error', error, retry: () => void species[missingVariety]?.refetch() }
+  }
+
+  const members = species.flatMap((result) => {
+    const name = result.data ? defaultVarietyName(result.data) : null
+    const pokemonData = name === null ? undefined : pokemonByName.get(name)?.data
+    return result.data && pokemonData ? [toPokemonDetail(pokemonData, result.data)] : []
+  })
+  return members.length === speciesNames.length ? { status: 'ready', members } : { status: 'loading' }
 }

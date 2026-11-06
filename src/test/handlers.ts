@@ -11,6 +11,7 @@ import speciesEevee from './fixtures/species-eevee.json'
 import speciesIndex from './fixtures/species-index.json'
 import typeBug from './fixtures/type-bug.json'
 import typeNormal from './fixtures/type-normal.json'
+import typePsychic from './fixtures/type-psychic.json'
 import typeSteel from './fixtures/type-steel.json'
 
 export const API = 'https://pokeapi.co/api/v2'
@@ -74,7 +75,7 @@ const REAL_POKEMON: Record<string, unknown> = {
   eevee: pokemonEevee,
   scizor: pokemonScizor,
 }
-const REAL_TYPES: Record<string, unknown> = { bug: typeBug, normal: typeNormal, steel: typeSteel }
+const REAL_TYPES: Record<string, unknown> = { bug: typeBug, normal: typeNormal, psychic: typePsychic, steel: typeSteel }
 const REAL_CHAINS = [chainBulbasaur, chainOddish, chainEevee, chainDeoxys]
 const indexIdByName = new Map([...indexNameById].map(([id, name]) => [name, id]))
 

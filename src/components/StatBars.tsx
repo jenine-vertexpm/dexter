@@ -9,7 +9,9 @@ export const MAX_BASE_STAT = 255
 // One row per stat: its name, its number, and a bar. The number is always shown as text, so the
 // bar is never the only way to read it (brief §3.1). The bar is also a "meter" for screen readers:
 // it is named after the stat and announces its value out of 255.
-export function StatBars({ stats }: { stats: PokemonDetail['stats'] }) {
+// `decimals` is how many decimal places each number shows: 0 for a Pokémon's own stats, 1 for
+// the team analysis's averages (so 50 shows as "50.0", lined up with "52.5").
+export function StatBars({ stats, decimals = 0 }: { stats: PokemonDetail['stats']; decimals?: number }) {
   // A unique prefix for this component's ids, so each bar can point at its label
   const idPrefix = useId()
 
@@ -23,7 +25,7 @@ export function StatBars({ stats }: { stats: PokemonDetail['stats'] }) {
             <span id={labelId} className="stat-name">
               {formatStatName(stat.name)}
             </span>
-            <span className="stat-value">{stat.value}</span>
+            <span className="stat-value">{stat.value.toFixed(decimals)}</span>
             <div
               role="meter"
               aria-labelledby={labelId}

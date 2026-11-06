@@ -1,0 +1,13 @@
+{
+  "format": "dexter-team",
+  "version": 1,
+  "team": {
+    "name": "Loud team",
+    "members": [
+      {
+        "species": "pikachu",
+        "nickname": "Sparky!"
+      }
+    ]
+  }
+}

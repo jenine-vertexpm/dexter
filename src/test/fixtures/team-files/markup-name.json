@@ -1,0 +1,13 @@
+{
+  "format": "dexter-team",
+  "version": 1,
+  "team": {
+    "name": "<img src=x onerror=alert(1)>",
+    "members": [
+      {
+        "species": "pikachu",
+        "nickname": null
+      }
+    ]
+  }
+}

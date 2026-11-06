@@ -1,0 +1,21 @@
+{
+  "format": "dexter-team",
+  "version": 1,
+  "team": {
+    "name": "Rain team",
+    "members": [
+      {
+        "species": "pikachu",
+        "nickname": "Sparky"
+      },
+      {
+        "species": "eevee",
+        "nickname": null
+      },
+      {
+        "species": "deoxys",
+        "nickname": "Space Rock"
+      }
+    ]
+  }
+}

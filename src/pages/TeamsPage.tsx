@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { StorageNotice } from '../components/StorageNotice.tsx'
+import { TeamImport } from '../components/TeamImport.tsx'
 import { TextFieldForm } from '../components/TextFieldForm.tsx'
 import * as rules from '../domain/team.ts'
 import { MAX_TEAM_NAME_LENGTH, MAX_TEAM_SIZE, type Team } from '../domain/team.ts'
@@ -9,8 +10,8 @@ import './TeamsPage.css'
 
 const TEAM_NAME_HINT = `Up to ${MAX_TEAM_NAME_LENGTH} characters.`
 
-// /teams: create, rename and delete teams (M3 plan T4), with any storage problem explained
-// above them (T5)
+// /teams: create, rename and delete teams (M3 plan T4), import one from a file (T10), with any
+// storage problem explained above them (T5)
 export function TeamsPage() {
   // savingPaused: saved teams are waiting for a recovery choice in the storage notice, so every
   // control that changes teams is disabled until then (plan §4.1). The notice says why.
@@ -54,6 +55,8 @@ export function TeamsPage() {
           disabled={savingPaused}
         />
       </section>
+
+      <TeamImport onImported={(name) => setAnnouncement(`Imported '${name}'.`)} />
 
       <section>
         {/* tabIndex={-1} lets code move focus here; it doesn't add a Tab stop */}

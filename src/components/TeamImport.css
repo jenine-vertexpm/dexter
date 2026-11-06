@@ -1,0 +1,40 @@
+/* Importing a team file, on the Teams page */
+.team-import {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.team-import input[type='file'] {
+  max-width: 100%;
+  font: inherit;
+}
+
+/* The same red as form errors; the text says what went wrong, colour is only a hint */
+.import-error {
+  margin-top: 8px;
+  color: #c62828;
+}
+
+.import-error p,
+.import-error ul {
+  margin: 0;
+}
+
+.import-error ul {
+  padding-left: 20px;
+}
+
+/* Long names or messages wrap instead of widening the page at 360px */
+.import-error,
+.import-success {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-color-scheme: dark) {
+  .import-error {
+    color: #ff8a80;
+  }
+}

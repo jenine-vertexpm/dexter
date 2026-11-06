@@ -1,7 +1,7 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.tsx'
 import type { Team, TeamMember } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
@@ -363,6 +363,90 @@ describe('TeamDetailPage: other states', () => {
     }
     // The member data still loads, and nothing was written
     expect(await within(card('eevee')).findByText('#0133')).toBeInTheDocument()
+    expect(localStorage.getItem(TEAMS_STORAGE_KEY)).toBe(stored)
+  })
+})
+
+describe('TeamDetailPage: Export (T9)', () => {
+  // jsdom can't save files, so the download is caught: the Blob handed to createObjectURL is what
+  // the user would get. The link click is recorded instead of followed.
+  function stubDownloads() {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-url')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    return {
+      revokeObjectURL,
+      async downloaded() {
+        expect(click).toHaveBeenCalledTimes(1)
+        const link = click.mock.contexts[0] as HTMLAnchorElement
+        const blob = createObjectURL.mock.calls[0][0] as Blob
+        return { filename: link.download, href: link.href, type: blob.type, text: await blob.text() }
+      },
+    }
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('downloads the team as a §4.2 JSON file: name, members in order with nicknames, no id', async () => {
+    const user = userEvent.setup()
+    const downloads = stubDownloads()
+    renderTeam()
+
+    await user.click(screen.getByRole('button', { name: 'Export team' }))
+
+    const file = await downloads.downloaded()
+    expect(file.filename).toBe('dexter-team-rain-team.json')
+    expect(file.href).toBe('blob:fake-url')
+    expect(file.type).toBe('application/json')
+    expect(JSON.parse(file.text)).toEqual({
+      format: 'dexter-team',
+      version: 1,
+      team: {
+        name: 'Rain team',
+        members: [
+          { species: 'deoxys', nickname: null },
+          { species: 'eevee', nickname: 'Fluffy' },
+          { species: 'pikachu', nickname: null },
+        ],
+      },
+    })
+    expect(file.text).not.toContain(TEAM_ID)
+    // The temporary URL is released once the download has started
+    await waitFor(() => expect(downloads.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url'))
+    expect(screen.getByRole('status')).toHaveTextContent('Exported Rain team.')
+  })
+
+  it('exports the team as it is now, after a move and a new nickname', async () => {
+    const user = userEvent.setup()
+    const downloads = stubDownloads()
+    renderTeam()
+
+    await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
+    await user.type(screen.getByLabelText('Nickname for pikachu'), 'Sparky')
+    await user.click(screen.getByRole('button', { name: 'Save nickname for pikachu' }))
+    await user.click(screen.getByRole('button', { name: 'Export team' }))
+
+    const { text } = await downloads.downloaded()
+    expect(JSON.parse(text).team.members).toEqual([
+      { species: 'deoxys', nickname: null },
+      { species: 'pikachu', nickname: 'Sparky' },
+      { species: 'eevee', nickname: 'Fluffy' },
+    ])
+  })
+
+  it('still exports while saving is paused, so the team can be kept safe (T5)', async () => {
+    const user = userEvent.setup()
+    const downloads = stubDownloads()
+    // The team is readable; a second, broken team pauses saving
+    const stored = JSON.stringify({ version: 1, teams: [team(), { id: 'broken' }] })
+    renderWithProviders(<App />, { url: `/teams/${TEAM_ID}`, storedTeams: stored })
+
+    await user.click(screen.getByRole('button', { name: 'Export team' }))
+
+    expect(JSON.parse((await downloads.downloaded()).text).team.name).toBe('Rain team')
+    // Exporting changes nothing in storage
     expect(localStorage.getItem(TEAMS_STORAGE_KEY)).toBe(stored)
   })
 })

@@ -5,6 +5,8 @@ import { TeamAnalysis } from '../components/TeamAnalysis.tsx'
 import { TeamMemberCard } from '../components/TeamMemberCard.tsx'
 import * as rules from '../domain/team.ts'
 import { MAX_TEAM_SIZE, teamIdSchema } from '../domain/team.ts'
+import { teamFileName, teamFileText } from '../domain/teamFile.ts'
+import { downloadText } from '../lib/download.ts'
 import { useTeams } from '../teams/useTeams.ts'
 import { NotFoundPage } from './NotFoundPage.tsx'
 import './TeamDetailPage.css'
@@ -52,7 +54,7 @@ export function TeamDetailPage() {
     )
   }
   // Taken out here, after the not-found check, so the functions below know the team exists
-  const { id, members } = team
+  const { id, name, members } = team
 
   function move(species: string, index: number, direction: 'up' | 'down') {
     const result = moveMember(id, index, direction)
@@ -63,6 +65,13 @@ export function TeamDetailPage() {
     const newPosition = direction === 'up' ? index : index + 2 // counted from 1
     focusAfterMove.current = { species, direction }
     setAnnouncement(`${species} moved to position ${newPosition} of ${members.length}.`)
+  }
+
+  // Saves the team as a JSON file (M3 plan §4.2). The browser shows the download; the
+  // announcement tells screen reader users it happened.
+  function exportTeam() {
+    downloadText(teamFileName(name), teamFileText({ id, name, members }))
+    setAnnouncement(`Exported ${name}.`)
   }
 
   function remove(species: string) {
@@ -93,6 +102,13 @@ export function TeamDetailPage() {
       <StorageNotice />
       <p>
         {members.length}/{MAX_TEAM_SIZE} Pokémon
+      </p>
+      {/* Exporting only reads the team, so it stays available even while saving is paused:
+          a downloaded copy is the way to keep a team safe then (T9) */}
+      <p>
+        <button type="button" onClick={exportTeam}>
+          Export team
+        </button>
       </p>
 
       {/* tabIndex={-1} lets code move focus here; it doesn't add a Tab stop */}

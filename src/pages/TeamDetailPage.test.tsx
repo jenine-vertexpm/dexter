@@ -6,7 +6,7 @@ import App from '../App.tsx'
 import type { Team, TeamMember } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
 import { API, detailHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 const TEAM_ID = '6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
@@ -31,8 +31,10 @@ beforeEach(() => {
   server.use(...detailHandlers())
 })
 
-function renderTeam(members: TeamMember[] = MEMBERS) {
-  return renderWithProviders(<App />, { url: `/teams/${TEAM_ID}`, storedTeams: [team(members)] })
+async function renderTeam(members: TeamMember[] = MEMBERS) {
+  const view = renderWithProviders(<App />, { url: `/teams/${TEAM_ID}`, storedTeams: [team(members)] })
+  await waitForPageToLoad()
+  return view
 }
 
 // The members as stored in localStorage
@@ -52,7 +54,7 @@ function card(species: string): HTMLElement {
 
 describe('TeamDetailPage: members', () => {
   it('shows the team name and the members in their saved order', async () => {
-    renderTeam()
+    await renderTeam()
 
     expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
     expect(screen.getByText('3/6 Pokémon')).toBeInTheDocument()
@@ -61,7 +63,7 @@ describe('TeamDetailPage: members', () => {
   })
 
   it('shows each member’s artwork, number, types, nickname and a link to its page', async () => {
-    renderTeam()
+    await renderTeam()
 
     const deoxys = card('deoxys')
     // The number comes from the species; the artwork and types from its default Pokémon
@@ -87,7 +89,7 @@ describe('TeamDetailPage: members', () => {
     server.events.on('request:start', ({ request }) => {
       requests.push(new URL(request.url).pathname)
     })
-    const { queryClient } = renderTeam()
+    const { queryClient } = await renderTeam()
     await within(card('eevee')).findByText('#0133')
 
     // The same cache entries the Pokémon detail page uses
@@ -112,7 +114,7 @@ describe('TeamDetailPage: loading and errors, per member', () => {
         return HttpResponse.json({})
       }),
     )
-    renderTeam()
+    await renderTeam()
 
     const eevee = card('eevee')
     expect(within(eevee).getByText('Loading…')).toBeInTheDocument()
@@ -127,7 +129,7 @@ describe('TeamDetailPage: loading and errors, per member', () => {
     server.use(
       http.get(`${API}/pokemon/eevee`, () => new HttpResponse(null, { status: 500 }), { once: true }),
     )
-    renderTeam()
+    await renderTeam()
 
     const eevee = card('eevee')
     expect(await within(eevee).findByRole('alert')).toHaveTextContent('Could not load eevee.')
@@ -143,7 +145,7 @@ describe('TeamDetailPage: loading and errors, per member', () => {
   it('shows "could not be found" for an unknown species, and it can still be removed', async () => {
     const user = userEvent.setup()
     // A well-formed name that PokéAPI doesn't have (detailHandlers answers 404)
-    renderTeam([{ species: 'missingno', nickname: null }, ...MEMBERS])
+    await renderTeam([{ species: 'missingno', nickname: null }, ...MEMBERS])
 
     const missing = card('missingno')
     expect(await within(missing).findByText('This Pokémon could not be found.')).toBeInTheDocument()
@@ -158,7 +160,7 @@ describe('TeamDetailPage: loading and errors, per member', () => {
 describe('TeamDetailPage: Remove', () => {
   it('removes a member, keeps the others in order and saves', async () => {
     const user = userEvent.setup()
-    renderTeam()
+    await renderTeam()
 
     await user.click(screen.getByRole('button', { name: 'Remove eevee' }))
 
@@ -175,7 +177,7 @@ describe('TeamDetailPage: Remove', () => {
 
   it('shows the empty state after the last member is removed', async () => {
     const user = userEvent.setup()
-    renderTeam([{ species: 'eevee', nickname: null }])
+    await renderTeam([{ species: 'eevee', nickname: null }])
 
     await user.click(screen.getByRole('button', { name: 'Remove eevee' }))
 
@@ -185,8 +187,8 @@ describe('TeamDetailPage: Remove', () => {
 })
 
 describe('TeamDetailPage: Move up and Move down (D16)', () => {
-  it('disables Move up for the first member and Move down for the last', () => {
-    renderTeam()
+  it('disables Move up for the first member and Move down for the last', async () => {
+    await renderTeam()
 
     expect(screen.getByRole('button', { name: 'Move deoxys up' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Move deoxys down' })).toBeEnabled()
@@ -198,7 +200,7 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
 
   it('moves a member up one place, saves, keeps focus on its button and announces the position', async () => {
     const user = userEvent.setup()
-    renderTeam()
+    await renderTeam()
 
     await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
 
@@ -210,7 +212,7 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
 
   it('moves a member down one place, with the keyboard', async () => {
     const user = userEvent.setup()
-    renderTeam()
+    await renderTeam()
 
     screen.getByRole('button', { name: 'Move deoxys down' }).focus()
     await user.keyboard('{Enter}')
@@ -223,7 +225,7 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
 
   it('moves focus to the other Move button when a member reaches the end', async () => {
     const user = userEvent.setup()
-    renderTeam()
+    await renderTeam()
 
     await user.click(screen.getByRole('button', { name: 'Move eevee up' }))
 
@@ -236,13 +238,14 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
 
   it('keeps the new order after the app starts again', async () => {
     const user = userEvent.setup()
-    const first = renderTeam()
+    const first = await renderTeam()
     await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
     await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
 
     // Like a reload: a fresh app reading the same localStorage
     first.unmount()
     renderWithProviders(<App />, { url: `/teams/${TEAM_ID}` })
+    await waitForPageToLoad()
 
     expect(shownSpecies()).toEqual(['pikachu', 'deoxys', 'eevee'])
   })
@@ -259,7 +262,7 @@ describe('TeamDetailPage: nicknames (D12)', () => {
   }
 
   it('sets a nickname: shown on the card and stored', async () => {
-    renderTeam()
+    await renderTeam()
 
     await saveNickname('pikachu', 'Sparky')
 
@@ -269,7 +272,7 @@ describe('TeamDetailPage: nicknames (D12)', () => {
   })
 
   it('changes a nickname, trimming the spaces at the ends', async () => {
-    renderTeam()
+    await renderTeam()
 
     // The field starts with the current nickname
     expect(screen.getByLabelText('Nickname for eevee')).toHaveValue('Fluffy')
@@ -280,7 +283,7 @@ describe('TeamDetailPage: nicknames (D12)', () => {
   })
 
   it.each(['', '   '])('clears a nickname when saved as %j, storing null', async (text) => {
-    renderTeam()
+    await renderTeam()
 
     await saveNickname('eevee', text)
 
@@ -294,7 +297,7 @@ describe('TeamDetailPage: nicknames (D12)', () => {
     ['<b>', 'Nickname can only contain letters, numbers and spaces.'],
     ['a'.repeat(13), 'Nickname must be 12 characters or fewer.'],
   ])('rejects %j with an inline message and stores nothing', async (text, message) => {
-    renderTeam()
+    await renderTeam()
 
     const field = await saveNickname('eevee', text)
 
@@ -308,7 +311,7 @@ describe('TeamDetailPage: nicknames (D12)', () => {
 
   it('re-checks the nickname while typing once a message is shown', async () => {
     const user = userEvent.setup()
-    renderTeam()
+    await renderTeam()
 
     const field = await saveNickname('eevee', 'Sparky!')
     expect(field).toHaveAttribute('aria-invalid', 'true')
@@ -321,8 +324,8 @@ describe('TeamDetailPage: nicknames (D12)', () => {
 })
 
 describe('TeamDetailPage: other states', () => {
-  it('shows an empty state with a link to the Pokémon list', () => {
-    renderTeam([])
+  it('shows an empty state with a link to the Pokémon list', async () => {
+    await renderTeam([])
 
     expect(screen.getByText(/This team has no Pokémon yet\./)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Browse the Pokémon list' })).toHaveAttribute('href', '/')
@@ -333,25 +336,27 @@ describe('TeamDetailPage: other states', () => {
     ['an unknown team id', `/teams/${UNKNOWN_ID}`],
     ['a malformed team id', '/teams/abc'],
     ['an extra path part', `/teams/${TEAM_ID}/extra`],
-  ])('shows the not-found page for %s', (_, url) => {
+  ])('shows the not-found page for %s', async (_, url) => {
     renderWithProviders(<App />, { url, storedTeams: [team()] })
+    await waitForPageToLoad()
 
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
   })
 
   it('goes back to the Teams page', async () => {
     const user = userEvent.setup()
-    renderTeam()
+    await renderTeam()
 
     await user.click(screen.getByRole('link', { name: 'Back to your teams' }))
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
   })
 
   it('disables every change control while saved teams wait for a recovery choice (T5)', async () => {
     // The team is readable; a second, broken team pauses saving
     const stored = JSON.stringify({ version: 1, teams: [team(), { id: 'broken' }] })
     renderWithProviders(<App />, { url: `/teams/${TEAM_ID}`, storedTeams: stored })
+    await waitForPageToLoad()
 
     expect(screen.getByRole('heading', { name: 'Problem with your saved teams' })).toBeInTheDocument()
     for (const species of ['deoxys', 'eevee', 'pikachu']) {
@@ -392,7 +397,7 @@ describe('TeamDetailPage: Export (T9)', () => {
   it('downloads the team as a §4.2 JSON file: name, members in order with nicknames, no id', async () => {
     const user = userEvent.setup()
     const downloads = stubDownloads()
-    renderTeam()
+    await renderTeam()
 
     await user.click(screen.getByRole('button', { name: 'Export team' }))
 
@@ -421,7 +426,7 @@ describe('TeamDetailPage: Export (T9)', () => {
   it('exports the team as it is now, after a move and a new nickname', async () => {
     const user = userEvent.setup()
     const downloads = stubDownloads()
-    renderTeam()
+    await renderTeam()
 
     await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
     await user.type(screen.getByLabelText('Nickname for pikachu'), 'Sparky')
@@ -442,6 +447,7 @@ describe('TeamDetailPage: Export (T9)', () => {
     // The team is readable; a second, broken team pauses saving
     const stored = JSON.stringify({ version: 1, teams: [team(), { id: 'broken' }] })
     renderWithProviders(<App />, { url: `/teams/${TEAM_ID}`, storedTeams: stored })
+    await waitForPageToLoad()
 
     await user.click(screen.getByRole('button', { name: 'Export team' }))
 

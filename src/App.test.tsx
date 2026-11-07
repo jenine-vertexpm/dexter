@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App.tsx'
 import { detailHandlers, listHandlers } from './test/handlers.ts'
-import { renderWithProviders } from './test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from './test/render.tsx'
 import { server } from './test/server.ts'
 
 // The list page loads data, so the fake PokéAPI answers its requests
@@ -13,32 +13,34 @@ beforeEach(() => {
 
 // renderWithProviders uses a MemoryRouter: a router that keeps its address in memory instead
 // of the browser's address bar, so each test can start at whichever URL it needs.
-function renderAt(url: string) {
-  return renderWithProviders(<App />, { url })
+async function renderAt(url: string) {
+  const view = renderWithProviders(<App />, { url })
+  await waitForPageToLoad()
+  return view
 }
 
 describe('routes', () => {
-  it('shows the Pokémon list at /', () => {
-    renderAt('/')
+  it('shows the Pokémon list at /', async () => {
+    await renderAt('/')
 
     expect(screen.getByRole('heading', { level: 1, name: 'Pokémon' })).toBeInTheDocument()
   })
 
   it('shows the detail page for /pokemon/:name, with the name from the URL', async () => {
     server.use(...detailHandlers())
-    renderAt('/pokemon/eevee')
+    await renderAt('/pokemon/eevee')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'eevee' })).toBeInTheDocument()
   })
 
-  it.each(['/nope', '/pokemon', '/pokemon/eevee/extra'])('shows the not-found page for %s', (url) => {
-    renderAt(url)
+  it.each(['/nope', '/pokemon', '/pokemon/eevee/extra'])('shows the not-found page for %s', async (url) => {
+    await renderAt(url)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
   })
 
-  it('shows the layout header on every page', () => {
-    renderAt('/nope')
+  it('shows the layout header on every page', async () => {
+    await renderAt('/nope')
 
     expect(screen.getByRole('banner')).toHaveTextContent('Dexter')
     expect(screen.getByRole('main')).toBeInTheDocument()
@@ -50,7 +52,7 @@ describe('navigation', () => {
     const user = userEvent.setup()
     // Detail handlers after list handlers, so they answer the detail page's requests first
     server.use(...detailHandlers())
-    renderAt('/pokemon/eevee')
+    await renderAt('/pokemon/eevee')
     await screen.findByRole('heading', { level: 1, name: 'eevee' })
 
     await user.click(screen.getByRole('link', { name: 'Dexter' }))
@@ -60,19 +62,19 @@ describe('navigation', () => {
 
   it('opens the Teams page from the header link', async () => {
     const user = userEvent.setup()
-    renderAt('/')
+    await renderAt('/')
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
     await user.click(within(nav).getByRole('link', { name: 'Teams' }))
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
     // NavLink marks the link to the page you're on
     expect(within(nav).getByRole('link', { name: 'Teams' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('goes back to the list from the not-found page', async () => {
     const user = userEvent.setup()
-    renderAt('/nope')
+    await renderAt('/nope')
 
     await user.click(screen.getByRole('link', { name: 'Back to the Pokémon list' }))
 

@@ -5,7 +5,7 @@ import App from '../App.tsx'
 import type { Team } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
 import { detailHandlers, listHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 import { SAVED_DATA_FILENAME } from './StorageNotice.tsx'
 
@@ -24,8 +24,10 @@ function stored() {
   return localStorage.getItem(TEAMS_STORAGE_KEY)
 }
 
-function renderAt(url: string, storedTeams?: Team[] | string) {
-  return renderWithProviders(<App />, { url, storedTeams })
+async function renderAt(url: string, storedTeams?: Team[] | string) {
+  const view = renderWithProviders(<App />, { url, storedTeams })
+  await waitForPageToLoad()
+  return view
 }
 
 // jsdom can't save files, so the download is caught: the Blob handed to createObjectURL is what
@@ -58,17 +60,17 @@ describe('StorageNotice: a notice for each storage status', () => {
     ['salvaged', SALVAGED, "1 saved team couldn't be read. Your other teams are shown, but changes aren't saved until you choose."],
     ['unreadable', UNREADABLE, "Your saved teams couldn't be read."],
     ['newer-version', NEWER_VERSION, 'Your teams were saved by a newer version of Dexter.'],
-  ])('%s: shows the notice and leaves the stored text untouched', (_, text, message) => {
-    renderAt('/teams', text)
+  ])('%s: shows the notice and leaves the stored text untouched', async (_, text, message) => {
+    await renderAt('/teams', text)
 
     expect(screen.getByRole('heading', { name: 'Problem with your saved teams' })).toBeInTheDocument()
     expect(screen.getByText(message)).toBeInTheDocument()
     expect(stored()).toBe(text)
   })
 
-  it('salvaged: counts several unreadable teams in the plural', () => {
+  it('salvaged: counts several unreadable teams in the plural', async () => {
     const text = JSON.stringify({ version: 1, teams: [RAIN, { id: 'bad' }, { id: 'worse' }] })
-    renderAt('/teams', text)
+    await renderAt('/teams', text)
 
     expect(screen.getByText(/^2 saved teams couldn't be read\./)).toBeInTheDocument()
   })
@@ -79,7 +81,7 @@ describe('StorageNotice: a notice for each storage status', () => {
     vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
       throw new DOMException('Blocked', 'SecurityError')
     })
-    renderAt('/teams')
+    await renderAt('/teams')
 
     expect(
       screen.getByText('Your browser is blocking storage, so teams will be lost when you close this tab.'),
@@ -90,7 +92,7 @@ describe('StorageNotice: a notice for each storage status', () => {
 
   it('save-failed: explains the change was not saved, and keeps it on screen', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('Full', 'QuotaExceededError')
     })
@@ -106,8 +108,8 @@ describe('StorageNotice: a notice for each storage status', () => {
     expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled()
   })
 
-  it('shows no notice when storage is working', () => {
-    renderAt('/teams', [RAIN])
+  it('shows no notice when storage is working', async () => {
+    await renderAt('/teams', [RAIN])
 
     expect(screen.queryByRole('heading', { name: 'Problem with your saved teams' })).not.toBeInTheDocument()
   })
@@ -120,7 +122,7 @@ describe('StorageNotice: team controls are disabled while waiting for a choice',
     ['newer-version', NEWER_VERSION],
   ])('%s: the create form is disabled, and storage is unchanged', async (_, text) => {
     const user = userEvent.setup()
-    renderAt('/teams', text)
+    await renderAt('/teams', text)
 
     expect(screen.getByLabelText('Team name')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Create team' })).toBeDisabled()
@@ -132,7 +134,7 @@ describe('StorageNotice: team controls are disabled while waiting for a choice',
 
   it('salvaged: Rename and Delete are disabled on the teams that are shown', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', SALVAGED)
+    await renderAt('/teams', SALVAGED)
 
     expect(screen.getByRole('button', { name: 'Rename Rain team' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Delete Rain team' })).toBeDisabled()
@@ -146,7 +148,7 @@ describe('StorageNotice: team controls are disabled while waiting for a choice',
 
   it('a rename or delete already open when saving pauses can no longer be confirmed, only cancelled', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN, SUN])
+    await renderAt('/teams', [RAIN, SUN])
     await user.click(screen.getByRole('button', { name: 'Rename Rain team' }))
     await user.click(screen.getByRole('button', { name: 'Delete Sun team' }))
 
@@ -172,7 +174,7 @@ describe('StorageNotice: team controls are disabled while waiting for a choice',
 
   it('controls are enabled again once a choice is made', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', SALVAGED)
+    await renderAt('/teams', SALVAGED)
 
     await user.click(screen.getByRole('button', { name: 'Keep the valid teams' }))
 
@@ -182,11 +184,11 @@ describe('StorageNotice: team controls are disabled while waiting for a choice',
     expect(screen.getByRole('button', { name: 'Delete Rain team' })).toBeEnabled()
   })
 
-  it('unavailable: controls stay enabled, because teams still work in memory', () => {
+  it('unavailable: controls stay enabled, because teams still work in memory', async () => {
     vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
       throw new DOMException('Blocked', 'SecurityError')
     })
-    renderAt('/teams')
+    await renderAt('/teams')
 
     expect(screen.getByLabelText('Team name')).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled()
@@ -201,7 +203,7 @@ describe('StorageNotice: downloading the original', () => {
   ])('%s: the file holds the exact stored text, and the temporary URL is released', async (_, text, button) => {
     const user = userEvent.setup()
     const downloads = stubDownloads()
-    renderAt('/teams', text)
+    await renderAt('/teams', text)
 
     await user.click(screen.getByRole('button', { name: button }))
 
@@ -216,7 +218,7 @@ describe('StorageNotice: downloading the original', () => {
 describe('StorageNotice: keeping the valid teams (salvaged)', () => {
   it('saves only the valid teams, then changes are saved normally', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', SALVAGED)
+    await renderAt('/teams', SALVAGED)
 
     await user.click(screen.getByRole('button', { name: 'Keep the valid teams' }))
 
@@ -236,7 +238,7 @@ describe('StorageNotice: starting with no teams (unreadable, newer-version)', ()
     ['newer-version', NEWER_VERSION],
   ])('%s: asks first; Cancel changes nothing', async (_, text) => {
     const user = userEvent.setup()
-    renderAt('/teams', text)
+    await renderAt('/teams', text)
 
     await user.click(screen.getByRole('button', { name: 'Start with no teams' }))
     expect(screen.getByText(/^Start with no teams\? This replaces your saved data/)).toBeInTheDocument()
@@ -256,7 +258,7 @@ describe('StorageNotice: starting with no teams (unreadable, newer-version)', ()
     ['newer-version', NEWER_VERSION],
   ])('%s: clears the data once confirmed, and a new team then persists', async (_, text) => {
     const user = userEvent.setup()
-    const first = renderAt('/teams', text)
+    const first = await renderAt('/teams', text)
 
     await user.click(screen.getByRole('button', { name: 'Start with no teams' }))
     await user.click(screen.getByRole('button', { name: 'Yes, start with no teams' }))
@@ -269,31 +271,31 @@ describe('StorageNotice: starting with no teams (unreadable, newer-version)', ()
 
     // Like a reload: a fresh app reading the same storage
     first.unmount()
-    renderAt('/teams')
+    await renderAt('/teams')
     expect(screen.getByRole('link', { name: 'Hail team' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Problem with your saved teams' })).not.toBeInTheDocument()
   })
 })
 
 describe('pages keep working when storage has problems', () => {
-  it('the Teams list shows the readable teams beside the notice', () => {
-    renderAt('/teams', SALVAGED)
+  it('the Teams list shows the readable teams beside the notice', async () => {
+    await renderAt('/teams', SALVAGED)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Rain team' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Problem with your saved teams' })).toBeInTheDocument()
   })
 
-  it('a readable team’s page shows the team and the notice', () => {
-    renderAt(`/teams/${ID_RAIN}`, SALVAGED)
+  it('a readable team’s page shows the team and the notice', async () => {
+    await renderAt(`/teams/${ID_RAIN}`, SALVAGED)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Problem with your saved teams' })).toBeInTheDocument()
     expect(stored()).toBe(SALVAGED)
   })
 
-  it('a team page with unreadable data shows not-found with the notice explaining why', () => {
-    renderAt(`/teams/${ID_RAIN}`, UNREADABLE)
+  it('a team page with unreadable data shows not-found with the notice explaining why', async () => {
+    await renderAt(`/teams/${ID_RAIN}`, UNREADABLE)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
     expect(screen.getByText("Your saved teams couldn't be read.")).toBeInTheDocument()
@@ -302,7 +304,7 @@ describe('pages keep working when storage has problems', () => {
 
   it('the Pokémon list at / still works', async () => {
     server.use(...listHandlers().handlers)
-    renderAt('/', UNREADABLE)
+    await renderAt('/', UNREADABLE)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Pokémon' })).toBeInTheDocument()
     expect((await screen.findAllByRole('article')).length).toBeGreaterThan(0)
@@ -311,7 +313,7 @@ describe('pages keep working when storage has problems', () => {
 
   it('a Pokémon page at /pokemon/eevee still works', async () => {
     server.use(...detailHandlers())
-    renderAt('/pokemon/eevee', NEWER_VERSION)
+    await renderAt('/pokemon/eevee', NEWER_VERSION)
 
     expect(await screen.findByRole('heading', { level: 1, name: 'eevee' })).toBeInTheDocument()
     expect(stored()).toBe(NEWER_VERSION)

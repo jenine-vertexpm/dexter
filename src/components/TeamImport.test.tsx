@@ -13,7 +13,7 @@ import rainTeamFile from '../test/fixtures/team-files/rain-team.json?raw'
 import sevenMembers from '../test/fixtures/team-files/seven-members.json?raw'
 import unknownSpecies from '../test/fixtures/team-files/unknown-species.json?raw'
 import { API, detailHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 const ID_RAIN = '6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
@@ -37,8 +37,10 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function renderTeams(storedTeams: Team[] | string = [SUN]) {
-  return renderWithProviders(<App />, { url: '/teams', storedTeams })
+async function renderTeams(storedTeams: Team[] | string = [SUN]) {
+  const view = renderWithProviders(<App />, { url: '/teams', storedTeams })
+  await waitForPageToLoad()
+  return view
 }
 
 // The saved data, exactly as stored
@@ -64,7 +66,7 @@ async function importFile(user: UserEvent, file: File) {
 describe('TeamImport: a valid file', () => {
   it('adds a new team with a new id: same name, members in order, nicknames', async () => {
     const user = userEvent.setup()
-    renderTeams()
+    await renderTeams()
 
     await importFile(user, teamFile(rainTeamFile, 'rain-team.json'))
 
@@ -88,12 +90,12 @@ describe('TeamImport: a valid file', () => {
 
   it('links to the new team', async () => {
     const user = userEvent.setup()
-    renderTeams()
+    await renderTeams()
     await importFile(user, teamFile(rainTeamFile))
 
     await user.click(await screen.findByRole('link', { name: 'Open Rain team' }))
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
     const members = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
     expect(members).toEqual(['pikachu', 'eevee', 'deoxys'])
   })
@@ -105,6 +107,7 @@ describe('TeamImport: a valid file', () => {
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderWithProviders(<App />, { url: `/teams/${ID_RAIN}`, storedTeams: [RAIN, SUN] })
+    await waitForPageToLoad()
 
     // Export from the team page
     await user.click(screen.getByRole('button', { name: 'Export team' }))
@@ -136,7 +139,7 @@ describe('TeamImport: a valid file', () => {
 describe('TeamImport: hostile and invalid files (§3.5)', () => {
   it('rejects a 17 KB file without reading it', async () => {
     const user = userEvent.setup()
-    renderTeams()
+    await renderTeams()
     const before = storedText()
     const file = teamFile('x'.repeat(17 * 1024), 'huge.json')
     const read = vi.spyOn(file, 'text')
@@ -159,7 +162,7 @@ describe('TeamImport: hostile and invalid files (§3.5)', () => {
     ['unknown-species.json', unknownSpecies, 'Pokémon 2: "pikachu-gmax" isn\'t a Pokémon species Dexter knows.'],
   ])('%s: lists the problem in an alert, and existing teams are unchanged', async (fileName, text, message) => {
     const user = userEvent.setup()
-    renderTeams([RAIN, SUN])
+    await renderTeams([RAIN, SUN])
     const before = storedText()
 
     await importFile(user, teamFile(text, fileName))
@@ -175,7 +178,7 @@ describe('TeamImport: hostile and invalid files (§3.5)', () => {
 
   it('rejects a name that clashes with an existing team (" RAIN team ")', async () => {
     const user = userEvent.setup()
-    renderTeams([RAIN, SUN])
+    await renderTeams([RAIN, SUN])
     const before = storedText()
     const text = JSON.stringify({ format: 'dexter-team', version: 1, team: { name: ' RAIN team ', members: [] } })
 
@@ -189,7 +192,7 @@ describe('TeamImport: hostile and invalid files (§3.5)', () => {
 
   it('imports a name containing markup, and shows it as text: no img element appears', async () => {
     const user = userEvent.setup()
-    renderTeams()
+    await renderTeams()
 
     await importFile(user, teamFile(markupName))
 
@@ -202,7 +205,7 @@ describe('TeamImport: hostile and invalid files (§3.5)', () => {
 
   it('a rejection after a success replaces the success message', async () => {
     const user = userEvent.setup()
-    renderTeams()
+    await renderTeams()
     await importFile(user, teamFile(rainTeamFile))
     await screen.findByRole('link', { name: 'Open Rain team' })
 
@@ -220,7 +223,7 @@ describe('TeamImport: the species index', () => {
         await delay('infinite')
       }),
     )
-    renderTeams()
+    await renderTeams()
 
     expect(screen.getByLabelText('Team file')).toBeDisabled()
     expect(screen.getByText('Loading the list of Pokémon species…')).toBeInTheDocument()
@@ -229,7 +232,7 @@ describe('TeamImport: the species index', () => {
   it('shows an error with Retry if the species index fails; Retry makes importing possible', async () => {
     const user = userEvent.setup()
     server.use(http.get(`${API}/pokemon-species`, () => new HttpResponse(null, { status: 500 }), { once: true }))
-    renderTeams()
+    await renderTeams()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the list of Pokémon species.')
     expect(screen.queryByLabelText('Team file')).not.toBeInTheDocument()
@@ -245,7 +248,7 @@ describe('TeamImport: saving paused (T5)', () => {
   it('disables importing while saved teams wait for a recovery choice', async () => {
     // One readable team and one broken one: saving is paused until the user chooses
     const stored = JSON.stringify({ version: 1, teams: [RAIN, { id: 'broken' }] })
-    renderTeams(stored)
+    await renderTeams(stored)
 
     expect(screen.getByRole('heading', { name: 'Problem with your saved teams' })).toBeInTheDocument()
     // Even once the species index has loaded

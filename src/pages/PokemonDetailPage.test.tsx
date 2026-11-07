@@ -8,7 +8,7 @@ import App from '../App.tsx'
 import { BATTLE_TYPES } from '../domain/battleTypes.ts'
 import typeNormal from '../test/fixtures/type-normal.json'
 import { API, detailHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 beforeEach(() => {
@@ -25,14 +25,16 @@ function GoTo({ url }: { url: string }) {
   )
 }
 
-function renderDetail(url: string, extra?: ReactNode) {
-  return renderWithProviders(
+async function renderDetail(url: string, extra?: ReactNode) {
+  const view = renderWithProviders(
     <>
       <App />
       {extra}
     </>,
     { url },
   )
+  await waitForPageToLoad()
+  return view
 }
 
 // Waits until the page has loaded and shows this Pokémon's name as its main heading
@@ -40,7 +42,7 @@ const findTitle = (name: string) => screen.findByRole('heading', { level: 1, nam
 
 describe('states', () => {
   it('shows a loading message first, then the Pokémon', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading Pokémon…')
     await findTitle('eevee')
@@ -50,7 +52,7 @@ describe('states', () => {
   it('shows an error with a retry button when the species fails, and loads it on retry', async () => {
     server.use(http.get(`${API}/pokemon-species/:name`, () => new HttpResponse(null, { status: 500 }), { once: true }))
     const user = userEvent.setup()
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not load eevee. PokéAPI had a problem (error 500).')
@@ -64,7 +66,7 @@ describe('states', () => {
   it('shows an error with a retry button when the Pokémon fails, and loads it on retry', async () => {
     server.use(http.get(`${API}/pokemon/:name`, () => HttpResponse.error(), { once: true }))
     const user = userEvent.setup()
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not load eevee. Could not reach PokéAPI. Check your connection.')
@@ -76,7 +78,7 @@ describe('states', () => {
 
   // "pikachuu" is a typo; "pikachu-gmax" is a form, not a species. PokéAPI answers 404 for both.
   it.each(['pikachuu', 'pikachu-gmax'])('shows the not-found page for /pokemon/%s', async (name) => {
-    renderDetail(`/pokemon/${name}`)
+    await renderDetail(`/pokemon/${name}`)
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to the Pokémon list' })).toBeInTheDocument()
@@ -93,7 +95,7 @@ describe('states', () => {
       }),
     )
     const user = userEvent.setup()
-    renderDetail('/pokemon/deoxys', <GoTo url="/pokemon/eevee" />)
+    await renderDetail('/pokemon/deoxys', <GoTo url="/pokemon/eevee" />)
     await waitFor(() => expect(deoxysSignal).toBeDefined())
 
     await user.click(screen.getByRole('button', { name: 'Go to /pokemon/eevee' }))
@@ -113,7 +115,7 @@ describe('content', () => {
         requested.push(String(params.name))
       }),
     )
-    renderDetail('/pokemon/deoxys')
+    await renderDetail('/pokemon/deoxys')
 
     await findTitle('deoxys')
     expect(requested).toEqual(['deoxys-normal'])
@@ -124,7 +126,7 @@ describe('content', () => {
   })
 
   it('shows artwork, number, types, height, weight and the cleaned English description', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     await findTitle('eevee')
 
     const artwork = screen.getByRole('img', { name: 'Official artwork of eevee' })
@@ -145,7 +147,7 @@ describe('content', () => {
   })
 
   it('shows each base stat as a labelled bar that carries its number', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     await findTitle('eevee')
 
     const expected = [
@@ -167,7 +169,7 @@ describe('content', () => {
   })
 
   it('marks the hidden ability in text', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     await findTitle('eevee')
 
     const abilities = within(screen.getByRole('region', { name: 'Abilities' })).getAllByRole('listitem')
@@ -203,13 +205,13 @@ describe('evolution chain', () => {
   const describeChain = (chain: HTMLElement) => describeList(within(chain).getAllByRole('list')[0] as Element)
 
   it('shows a linear chain as a line: bulbasaur → ivysaur → venusaur', async () => {
-    renderDetail('/pokemon/bulbasaur')
+    await renderDetail('/pokemon/bulbasaur')
 
     expect(describeChain(await findChain('bulbasaur'))).toBe('bulbasaur > ivysaur > venusaur')
   })
 
   it('shows all eight of Eevee’s evolutions as branches from Eevee', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     const chain = await findChain('eevee')
 
     expect(describeChain(chain)).toBe(
@@ -222,13 +224,13 @@ describe('evolution chain', () => {
   })
 
   it('keeps a later branch in place: gloom evolves into vileplume or bellossom', async () => {
-    renderDetail('/pokemon/gloom')
+    await renderDetail('/pokemon/gloom')
 
     expect(describeChain(await findChain('oddish'))).toBe('oddish > gloom > (vileplume | bellossom)')
   })
 
   it('links every species in the chain to its detail page', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     const links = within(await findChain('eevee')).getAllByRole('link')
 
     const names = ['eevee', 'vaporeon', 'jolteon', 'flareon', 'espeon', 'umbreon', 'leafeon', 'glaceon', 'sylveon']
@@ -236,7 +238,7 @@ describe('evolution chain', () => {
   })
 
   it('marks the Pokémon being viewed, and only that one', async () => {
-    renderDetail('/pokemon/gloom')
+    await renderDetail('/pokemon/gloom')
     const chain = await findChain('oddish')
 
     const current = within(chain).getByRole('link', { name: 'gloom' })
@@ -250,7 +252,7 @@ describe('evolution chain', () => {
 
   it('goes to another species’ page from the chain', async () => {
     const user = userEvent.setup()
-    renderDetail('/pokemon/gloom')
+    await renderDetail('/pokemon/gloom')
 
     await user.click(within(await findChain('oddish')).getByRole('link', { name: 'bellossom' }))
 
@@ -268,7 +270,7 @@ describe('evolution chain', () => {
         return new HttpResponse(null, { status: 500 })
       }),
     )
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     await findTitle('eevee')
 
     expect(await within(section()).findByRole('status')).toHaveTextContent('Loading evolution chain…')
@@ -278,7 +280,7 @@ describe('evolution chain', () => {
   it('shows an error with a retry inside the section, keeps the rest of the page, and loads on retry', async () => {
     server.use(http.get(`${API}/evolution-chain/:id`, () => new HttpResponse(null, { status: 500 }), { once: true }))
     const user = userEvent.setup()
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     await findTitle('eevee')
 
     const alert = await within(section()).findByRole('alert')
@@ -310,7 +312,7 @@ describe('type matchups', () => {
   const asObject = (rows: [string, string][]) => Object.fromEntries(rows)
 
   it('shows a single-type Pokémon’s matchups (eevee, normal)', async () => {
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     const matchups = asObject(await findMatchups())
 
     // From the real normal type: 2× from fighting, nothing from ghost, 1× from the rest
@@ -322,7 +324,7 @@ describe('type matchups', () => {
   })
 
   it('combines both types of a dual-type Pokémon (scizor, bug/steel): 4×, ¼× and 0×', async () => {
-    renderDetail('/pokemon/scizor')
+    await renderDetail('/pokemon/scizor')
     const matchups = asObject(await findMatchups())
 
     expect(matchups.fire).toBe('4×') // bug 2× and steel 2×
@@ -332,7 +334,7 @@ describe('type matchups', () => {
   })
 
   it('lists exactly the 18 battle types, in order', async () => {
-    renderDetail('/pokemon/scizor')
+    await renderDetail('/pokemon/scizor')
     const rows = await findMatchups()
 
     expect(rows).toHaveLength(18)
@@ -350,7 +352,7 @@ describe('type matchups', () => {
       },
     }
     server.use(http.get(`${API}/type/normal`, () => HttpResponse.json(normalWithExtras)))
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
 
     const rows = await findMatchups()
 
@@ -365,7 +367,7 @@ describe('type matchups', () => {
         return new HttpResponse(null, { status: 500 })
       }),
     )
-    renderDetail('/pokemon/eevee')
+    await renderDetail('/pokemon/eevee')
     await findTitle('eevee')
 
     expect(await within(section()).findByRole('status')).toHaveTextContent('Loading type matchups…')
@@ -376,7 +378,7 @@ describe('type matchups', () => {
     // Steel fails once; bug loads. Retry asks again only for what failed.
     server.use(http.get(`${API}/type/steel`, () => new HttpResponse(null, { status: 500 }), { once: true }))
     const user = userEvent.setup()
-    renderDetail('/pokemon/scizor')
+    await renderDetail('/pokemon/scizor')
     await findTitle('scizor')
 
     const alert = await within(section()).findByRole('alert')
@@ -397,7 +399,7 @@ describe('previous and next', () => {
   const nav = () => screen.findByRole('navigation', { name: 'Previous and next Pokémon' })
 
   it('links to the species before and after by number', async () => {
-    renderDetail('/pokemon/pikachu')
+    await renderDetail('/pokemon/pikachu')
     const links = within(await nav())
 
     expect(links.getByRole('link', { name: /previous/i })).toHaveAttribute('href', '/pokemon/arbok')
@@ -406,7 +408,7 @@ describe('previous and next', () => {
   })
 
   it('has no previous link on the first species', async () => {
-    renderDetail('/pokemon/bulbasaur')
+    await renderDetail('/pokemon/bulbasaur')
     const links = within(await nav())
 
     expect(links.queryByRole('link', { name: /previous/i })).not.toBeInTheDocument()
@@ -414,7 +416,7 @@ describe('previous and next', () => {
   })
 
   it('has no next link on the last species', async () => {
-    renderDetail('/pokemon/pecharunt')
+    await renderDetail('/pokemon/pecharunt')
     const links = within(await nav())
 
     expect(links.queryByRole('link', { name: /next/i })).not.toBeInTheDocument()
@@ -423,7 +425,7 @@ describe('previous and next', () => {
 
   it('goes to the next species when the link is followed', async () => {
     const user = userEvent.setup()
-    renderDetail('/pokemon/pikachu')
+    await renderDetail('/pokemon/pikachu')
 
     await user.click(within(await nav()).getByRole('link', { name: /next/i }))
 

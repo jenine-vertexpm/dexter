@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import App from '../App.tsx'
 import speciesDeoxys from '../test/fixtures/species-deoxys.json'
 import { API, fakePokemon, listHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 let counts: ReturnType<typeof listHandlers>['counts']
@@ -31,14 +31,16 @@ function BrowserControls() {
   )
 }
 
-function renderList(url = '/') {
-  return renderWithProviders(
+async function renderList(url = '/') {
+  const view = renderWithProviders(
     <>
       <App />
       <BrowserControls />
     </>,
     { url },
   )
+  await waitForPageToLoad()
+  return view
 }
 
 // The names of the cards on screen, in order (each card is labelled with its name)
@@ -58,7 +60,7 @@ const PAGE_2 = [
 
 describe('loading the list', () => {
   it('shows a loading message first, then the first page', async () => {
-    renderList()
+    await renderList()
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading Pokémon…')
     const names = await cardNames()
@@ -70,7 +72,7 @@ describe('loading the list', () => {
   it('shows an error with a retry button when the list fails, and loads it on retry', async () => {
     server.use(http.get(`${API}/pokemon-species`, () => new HttpResponse(null, { status: 500 }), { once: true }))
     const user = userEvent.setup()
-    renderList()
+    await renderList()
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not load the Pokémon list. PokéAPI had a problem (error 500).')
@@ -84,21 +86,21 @@ describe('loading the list', () => {
 
 describe('pages in the URL', () => {
   it('shows the page the URL asks for', async () => {
-    renderList('/?page=2')
+    await renderList('/?page=2')
 
     expect(await cardNames()).toEqual(PAGE_2)
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
   })
 
   it('treats an invalid page in the URL as page 1', async () => {
-    renderList('/?page=abc')
+    await renderList('/?page=abc')
 
     expect((await cardNames())[0]).toBe(PAGE_1_FIRST)
   })
 
   it('goes to the next page: the URL and the names change', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
 
     await user.click(screen.getByRole('link', { name: 'Next page' }))
@@ -110,7 +112,7 @@ describe('pages in the URL', () => {
 
   it('returns to the earlier page with the browser’s Back button', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
     await user.click(screen.getByRole('link', { name: 'Next page' }))
     await cardNames()
@@ -123,7 +125,7 @@ describe('pages in the URL', () => {
 
   it('has no Previous link on the first page and no Next link on the last', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
     expect(screen.queryByRole('link', { name: 'Previous page' })).not.toBeInTheDocument()
 
@@ -137,7 +139,7 @@ describe('pages in the URL', () => {
 
   it('keeps other list settings in the URL when changing page', async () => {
     // "e" matches more than one page of species
-    renderList('/?q=e')
+    await renderList('/?q=e')
     await cardNames()
 
     expect(screen.getByRole('link', { name: 'Next page' })).toHaveAttribute('href', '/?q=e&page=2')
@@ -145,7 +147,7 @@ describe('pages in the URL', () => {
 
   it('explains a page past the end and links back to page 1', async () => {
     const user = userEvent.setup()
-    renderList('/?page=9')
+    await renderList('/?page=9')
 
     expect(await screen.findByText(/Page 9 does not exist\. There are only 3 pages\./)).toBeInTheDocument()
 
@@ -156,7 +158,7 @@ describe('pages in the URL', () => {
 
   it('makes no new requests when returning to a page already seen', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     // Wait until a card has loaded its types ("normal" is also a type filter checkbox, so look inside the card)
     await within(await screen.findByRole('article', { name: PAGE_1_FIRST })).findByText('normal')
     await user.click(screen.getByRole('link', { name: 'Next page' }))
@@ -172,7 +174,7 @@ describe('pages in the URL', () => {
 
 describe('cards', () => {
   it('shows number, name, artwork and types, and links to the detail page', async () => {
-    renderList()
+    await renderList()
 
     const card = await screen.findByRole('article', { name: 'charmander' })
 
@@ -182,7 +184,7 @@ describe('cards', () => {
   })
 
   it('loads artwork lazily with its size reserved', async () => {
-    renderList()
+    await renderList()
     const card = await screen.findByRole('article', { name: 'charmander' })
     await within(card).findByText('normal')
 
@@ -200,7 +202,7 @@ describe('cards', () => {
         HttpResponse.json({ ...fakePokemon(4, 'charmander'), sprites: { other: { 'official-artwork': { front_default: null } } } }),
       ),
     )
-    renderList()
+    await renderList()
 
     const card = await screen.findByRole('article', { name: 'charmander' })
 
@@ -215,7 +217,7 @@ describe('cards', () => {
         return HttpResponse.json(fakePokemon(1, 'bulbasaur'))
       }),
     )
-    renderList()
+    await renderList()
 
     const card = await screen.findByRole('article', { name: PAGE_1_FIRST })
 
@@ -226,7 +228,7 @@ describe('cards', () => {
   it('shows an error with a retry button on a card that fails, and loads it on retry', async () => {
     server.use(http.get(`${API}/pokemon/5`, () => new HttpResponse(null, { status: 503 }), { once: true }))
     const user = userEvent.setup()
-    renderList()
+    await renderList()
 
     const card = await screen.findByRole('article', { name: 'charmeleon' })
     const alert = await within(card).findByRole('alert')
@@ -259,7 +261,7 @@ describe('cards', () => {
         }),
       ),
     )
-    renderList()
+    await renderList()
 
     const card = await screen.findByRole('article', { name: PAGE_1_FIRST })
 
@@ -273,7 +275,7 @@ describe('search', () => {
 
   it('finds Pokémon by part of the name, ignoring upper and lower case', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
 
     await user.type(searchBox(), 'PIK')
@@ -288,7 +290,7 @@ describe('search', () => {
   })
 
   it('shows the search from the URL, so reloading or sharing the link keeps it', async () => {
-    renderList('/?q=pik')
+    await renderList('/?q=pik')
 
     expect(await cardNames()).toEqual(['pikachu'])
     expect(searchBox()).toHaveValue('pik')
@@ -297,7 +299,7 @@ describe('search', () => {
   it('goes back to page 1 when the search changes, and keeps other settings in the URL', async () => {
     const user = userEvent.setup()
     // The fire filter has one page, so page 2 is past the end until the search resets it
-    renderList('/?type=fire&page=2')
+    await renderList('/?type=fire&page=2')
     await screen.findByText(/Page 2 does not exist/)
 
     await user.type(searchBox(), 'a')
@@ -308,7 +310,7 @@ describe('search', () => {
 
   it('says when nothing matches, showing the search as plain text', async () => {
     const user = userEvent.setup()
-    const { container } = renderList()
+    const { container } = await renderList()
     await cardNames()
 
     await user.type(searchBox(), '<b>zz</b>')
@@ -321,7 +323,7 @@ describe('search', () => {
 
   it('adds one history entry for a search, not one per letter: Back returns to before the search', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
     await user.click(screen.getByRole('link', { name: 'Next page' }))
     await cardNames()
@@ -339,7 +341,7 @@ describe('search', () => {
 
   it('restores the earlier search and page with Back after a page change', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
     await user.type(searchBox(), 'e')
     await user.click(screen.getByRole('link', { name: 'Next page' }))
@@ -369,7 +371,7 @@ describe('search', () => {
       }),
     )
     const user = userEvent.setup()
-    const { queryClient } = renderList('/?q=ra')
+    const { queryClient } = await renderList('/?q=ra')
     expect(await cardNames()).toEqual(['rattata', 'raticate', 'raichu', 'nidoran-f'])
     expect(within(screen.getByRole('article', { name: 'rattata' })).getByRole('status')).toHaveTextContent('Loading…')
 
@@ -394,7 +396,7 @@ describe('type filter', () => {
 
   it('shows only Pokémon of one type', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
 
     await user.click(typeBox('fire'))
@@ -406,7 +408,7 @@ describe('type filter', () => {
 
   it('with two types, shows only Pokémon that have both', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
 
     await user.click(typeBox('fire'))
@@ -418,7 +420,7 @@ describe('type filter', () => {
 
   it('combines with the name search', async () => {
     const user = userEvent.setup()
-    renderList('/?q=p')
+    await renderList('/?q=p')
     await cardNames()
 
     await user.click(typeBox('flying'))
@@ -429,7 +431,7 @@ describe('type filter', () => {
 
   it('goes back to page 1 and adds a history entry, so Back undoes the change', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
     await user.click(screen.getByRole('link', { name: 'Next page' }))
     await cardNames()
@@ -452,7 +454,7 @@ describe('type filter', () => {
       }),
     )
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
 
     await user.click(typeBox('fire'))
@@ -464,7 +466,7 @@ describe('type filter', () => {
   it('shows an error with a retry button when a type fails, and filters on retry', async () => {
     server.use(http.get(`${API}/type/fire`, () => new HttpResponse(null, { status: 500 }), { once: true }))
     const user = userEvent.setup()
-    renderList('/?type=fire')
+    await renderList('/?type=fire')
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not load the fire type. PokéAPI had a problem (error 500).')
@@ -477,20 +479,20 @@ describe('type filter', () => {
   })
 
   it('says when nothing has the chosen types, naming the filters', async () => {
-    renderList('/?type=fire&type=water')
+    await renderList('/?type=fire&type=water')
 
     expect(await screen.findByText('No Pokémon have the types fire and water.')).toBeInTheDocument()
     expect(screen.queryAllByRole('article')).toHaveLength(0)
   })
 
   it('names the search and the type when nothing matches both', async () => {
-    renderList('/?q=squirt&type=fire')
+    await renderList('/?q=squirt&type=fire')
 
     expect(await screen.findByText("No Pokémon match 'squirt' with the type fire.")).toBeInTheDocument()
   })
 
   it('restores types, search and page from a shared URL', async () => {
-    renderList('/?type=fire&type=flying&q=char&page=1')
+    await renderList('/?type=fire&type=flying&q=char&page=1')
 
     expect(await cardNames()).toEqual(['charizard'])
     expect(typeBox('fire')).toBeChecked()
@@ -500,7 +502,7 @@ describe('type filter', () => {
   })
 
   it('ignores unknown types and any type after the second in the URL', async () => {
-    renderList('/?type=stellar&type=fire&type=flying&type=water')
+    await renderList('/?type=stellar&type=fire&type=flying&type=water')
 
     expect(await cardNames()).toEqual(['charizard'])
     expect(typeBox('water')).not.toBeChecked()
@@ -510,7 +512,7 @@ describe('type filter', () => {
 
   it('blocks a third type and explains why', async () => {
     const user = userEvent.setup()
-    renderList('/?type=fire&type=flying')
+    await renderList('/?type=fire&type=flying')
     await cardNames()
 
     expect(typeBox('water')).toBeDisabled()
@@ -527,7 +529,7 @@ describe('type filter', () => {
 
   it('reuses a type it has already loaded', async () => {
     const user = userEvent.setup()
-    renderList()
+    await renderList()
     await cardNames()
 
     await user.click(typeBox('fire'))

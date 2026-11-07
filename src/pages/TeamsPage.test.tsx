@@ -5,7 +5,7 @@ import App from '../App.tsx'
 import type { Team } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
 import { detailHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 const ID_RAIN = '6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
@@ -27,8 +27,10 @@ beforeEach(() => {
 })
 
 // The whole app at `url`, so routes and the header are the real ones
-function renderAt(url: string, storedTeams?: Team[] | string) {
-  return renderWithProviders(<App />, { url, storedTeams })
+async function renderAt(url: string, storedTeams?: Team[] | string) {
+  const view = renderWithProviders(<App />, { url, storedTeams })
+  await waitForPageToLoad()
+  return view
 }
 
 function storedNames(): string[] {
@@ -50,16 +52,16 @@ function row(name: string): HTMLElement {
 }
 
 describe('TeamsPage: showing teams', () => {
-  it('shows an empty state when there are no teams', () => {
-    renderAt('/teams')
+  it('shows an empty state when there are no teams', async () => {
+    await renderAt('/teams')
 
     expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
     expect(screen.getByText(/You don't have any teams yet/)).toBeInTheDocument()
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
   })
 
-  it('lists each team with its member count and a link to its page', () => {
-    renderAt('/teams', [RAIN, SUN])
+  it('lists each team with its member count and a link to its page', async () => {
+    await renderAt('/teams', [RAIN, SUN])
 
     expect(teamLinks()).toEqual(['Rain team', 'Sun team'])
     expect(row('Rain team')).toHaveTextContent('2/6 Pokémon')
@@ -70,11 +72,11 @@ describe('TeamsPage: showing teams', () => {
 
   it('opens the team page from its link', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
 
     await user.click(screen.getByRole('link', { name: 'Rain team' }))
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
   })
 
   // Storage notices are tested in src/components/StorageNotice.test.tsx
@@ -83,7 +85,7 @@ describe('TeamsPage: showing teams', () => {
 describe('TeamsPage: creating a team', () => {
   it('creates a team, saves it and clears the field', async () => {
     const user = userEvent.setup()
-    renderAt('/teams')
+    await renderAt('/teams')
 
     await user.type(screen.getByLabelText('Team name'), '  Rain team ')
     await user.click(screen.getByRole('button', { name: 'Create team' }))
@@ -103,7 +105,7 @@ describe('TeamsPage: creating a team', () => {
     ['a duplicate', ' rain TEAM ', "A team called 'Rain team' already exists."],
   ])('rejects a name that is %s with an inline message', async (_, name, message) => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
     const field = screen.getByLabelText('Team name')
 
     if (name !== '') await user.type(field, name)
@@ -119,7 +121,7 @@ describe('TeamsPage: creating a team', () => {
 
   it('re-checks the name while typing once a message is shown', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
     const field = screen.getByLabelText('Team name')
 
     // No message before the first submit, even for a name that clashes
@@ -141,7 +143,7 @@ describe('TeamsPage: creating a team', () => {
 
   it('can be used with the keyboard only', async () => {
     const user = userEvent.setup()
-    renderAt('/teams')
+    await renderAt('/teams')
 
     // Tab from the start of the page: Dexter, Teams, then the name field
     await user.tab()
@@ -163,7 +165,7 @@ describe('TeamsPage: renaming a team', () => {
   }
 
   it('renames a team inline and saves it', async () => {
-    renderAt('/teams', [RAIN, SUN])
+    await renderAt('/teams', [RAIN, SUN])
     const { user, field } = await startRename('Rain team')
 
     // The field opens focused, holding the current name
@@ -179,7 +181,7 @@ describe('TeamsPage: renaming a team', () => {
   })
 
   it('allows a different capitalisation of the same name', async () => {
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
     const { user, field } = await startRename('Rain team')
 
     await user.clear(field)
@@ -193,7 +195,7 @@ describe('TeamsPage: renaming a team', () => {
     ['31 characters', 'a'.repeat(31), 'Team name must be 30 characters or fewer.'],
     ['another team’s name', '  sun team', "A team called 'Sun team' already exists."],
   ])('rejects a name that is %s with an inline message', async (_, name, message) => {
-    renderAt('/teams', [RAIN, SUN])
+    await renderAt('/teams', [RAIN, SUN])
     const { user, field } = await startRename('Rain team')
 
     await user.clear(field)
@@ -208,7 +210,7 @@ describe('TeamsPage: renaming a team', () => {
   })
 
   it('leaves the name unchanged on Cancel', async () => {
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
     const { user, field } = await startRename('Rain team')
 
     await user.type(field, 'Storm')
@@ -222,7 +224,7 @@ describe('TeamsPage: renaming a team', () => {
 describe('TeamsPage: deleting a team', () => {
   it('asks first, then deletes the team when confirmed', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN, SUN])
+    await renderAt('/teams', [RAIN, SUN])
 
     await user.click(screen.getByRole('button', { name: 'Delete Rain team' }))
     // Step 1 deletes nothing
@@ -239,7 +241,7 @@ describe('TeamsPage: deleting a team', () => {
 
   it('keeps the team when cancelled', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
 
     await user.click(screen.getByRole('button', { name: 'Delete Rain team' }))
     // Focus starts on Cancel, the safe choice
@@ -253,7 +255,7 @@ describe('TeamsPage: deleting a team', () => {
 
   it('shows the empty state after the last team is deleted', async () => {
     const user = userEvent.setup()
-    renderAt('/teams', [RAIN])
+    await renderAt('/teams', [RAIN])
 
     await user.click(screen.getByRole('button', { name: 'Delete Rain team' }))
     await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
@@ -265,7 +267,7 @@ describe('TeamsPage: deleting a team', () => {
 describe('TeamsPage: persistence', () => {
   it('keeps created, renamed and deleted changes after the app starts again', async () => {
     const user = userEvent.setup()
-    const first = renderAt('/teams', [RAIN, SUN])
+    const first = await renderAt('/teams', [RAIN, SUN])
 
     await user.type(screen.getByLabelText('Team name'), 'Hail team{Enter}')
     await user.click(screen.getByRole('button', { name: 'Rename Rain team' }))
@@ -277,7 +279,7 @@ describe('TeamsPage: persistence', () => {
 
     // Like a reload: a fresh app reading the same localStorage
     first.unmount()
-    renderAt('/teams')
+    await renderAt('/teams')
 
     expect(teamLinks()).toEqual(['Storm team', 'Hail team'])
   })

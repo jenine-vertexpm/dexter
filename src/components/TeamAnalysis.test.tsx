@@ -6,7 +6,7 @@ import App from '../App.tsx'
 import { BATTLE_TYPES } from '../domain/battleTypes.ts'
 import type { TeamMember } from '../domain/team.ts'
 import { API, detailHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 // The analysis is tested on the real team page: the member cards there load the members, and
@@ -23,11 +23,13 @@ beforeEach(() => {
   server.use(...detailHandlers())
 })
 
-function renderTeam(teamMembers: TeamMember[]) {
-  return renderWithProviders(<App />, {
+async function renderTeam(teamMembers: TeamMember[]) {
+  const view = renderWithProviders(<App />, {
     url: `/teams/${TEAM_ID}`,
     storedTeams: [{ id: TEAM_ID, name: 'Rain team', members: teamMembers }],
   })
+  await waitForPageToLoad()
+  return view
 }
 
 function analysis(): HTMLElement {
@@ -48,14 +50,14 @@ function rowCells(table: HTMLElement, type: string): string[] {
 
 describe('TeamAnalysis: the table', () => {
   it('lists all 18 attacking types, in order', async () => {
-    renderTeam(members('deoxys', 'eevee', 'pikachu'))
+    await renderTeam(members('deoxys', 'eevee', 'pikachu'))
 
     const table = await findTable()
     expect(within(table).getAllByRole('rowheader').map((header) => header.textContent)).toEqual([...BATTLE_TYPES])
   })
 
   it('shows weak, resist and immune as three separate columns of numbers', async () => {
-    renderTeam(members('deoxys', 'eevee', 'pikachu'))
+    await renderTeam(members('deoxys', 'eevee', 'pikachu'))
 
     const table = await findTable()
     const headers = within(table).getAllByRole('columnheader').map((header) => header.textContent)
@@ -70,7 +72,7 @@ describe('TeamAnalysis: the table', () => {
 
   it('marks a shared weakness in words, and only that row', async () => {
     // Three normal-type members: all weak to fighting, none resists or is immune
-    renderTeam(members('eevee', 'pikachu', 'bulbasaur'))
+    await renderTeam(members('eevee', 'pikachu', 'bulbasaur'))
 
     const table = await findTable()
     expect(rowCells(table, 'fighting')).toEqual(['3', '0', '0', '⚠ Shared weakness'])
@@ -82,7 +84,7 @@ describe('TeamAnalysis: the table', () => {
   it('removes the mark when a member that resists is in the team, and brings it back when that member leaves', async () => {
     const user = userEvent.setup()
     // Deoxys (psychic) resists fighting
-    renderTeam(members('eevee', 'pikachu', 'bulbasaur', 'deoxys'))
+    await renderTeam(members('eevee', 'pikachu', 'bulbasaur', 'deoxys'))
 
     const table = await findTable()
     expect(rowCells(table, 'fighting')).toEqual(['3', '1', '0', ''])
@@ -93,7 +95,7 @@ describe('TeamAnalysis: the table', () => {
   })
 
   it('shows the average base stats to 1 decimal', async () => {
-    renderTeam(members('eevee', 'deoxys'))
+    await renderTeam(members('eevee', 'deoxys'))
 
     await findTable()
     const meters = within(analysis()).getAllByRole('meter')
@@ -111,7 +113,7 @@ describe('TeamAnalysis: loading, errors and empty team', () => {
         await delay('infinite')
       }),
     )
-    renderTeam(members('deoxys', 'eevee'))
+    await renderTeam(members('deoxys', 'eevee'))
 
     // The members load, but the analysis waits for psychic
     expect(await screen.findByText('#0386')).toBeInTheDocument()
@@ -122,7 +124,7 @@ describe('TeamAnalysis: loading, errors and empty team', () => {
   it('shows an error with Retry when a type fails to load; Retry loads the analysis', async () => {
     const user = userEvent.setup()
     server.use(http.get(`${API}/type/psychic`, () => new HttpResponse(null, { status: 500 }), { once: true }))
-    renderTeam(members('deoxys', 'eevee'))
+    await renderTeam(members('deoxys', 'eevee'))
 
     expect(await within(analysis()).findByRole('alert')).toHaveTextContent('Could not load the team analysis.')
 
@@ -136,7 +138,7 @@ describe('TeamAnalysis: loading, errors and empty team', () => {
     const user = userEvent.setup()
     // Every request for psychic fails
     server.use(http.get(`${API}/type/psychic`, () => new HttpResponse(null, { status: 500 })))
-    renderTeam(members('deoxys', 'eevee', 'pikachu'))
+    await renderTeam(members('deoxys', 'eevee', 'pikachu'))
 
     expect(await within(analysis()).findByRole('alert')).toBeInTheDocument()
     // The members still show, and can still be changed
@@ -153,7 +155,7 @@ describe('TeamAnalysis: loading, errors and empty team', () => {
   it('shows an error when a member fails to load; its Retry reloads the member and the analysis', async () => {
     const user = userEvent.setup()
     server.use(http.get(`${API}/pokemon/eevee`, () => new HttpResponse(null, { status: 500 }), { once: true }))
-    renderTeam(members('deoxys', 'eevee'))
+    await renderTeam(members('deoxys', 'eevee'))
 
     expect(await within(analysis()).findByRole('alert')).toHaveTextContent('Could not load the team analysis.')
 
@@ -164,8 +166,8 @@ describe('TeamAnalysis: loading, errors and empty team', () => {
     expect(await screen.findByText('#0133')).toBeInTheDocument()
   })
 
-  it('asks for Pokémon when the team is empty', () => {
-    renderTeam([])
+  it('asks for Pokémon when the team is empty', async () => {
+    await renderTeam([])
 
     expect(within(analysis()).getByText('Add Pokémon to see the analysis.')).toBeInTheDocument()
     expect(within(analysis()).queryByRole('table')).not.toBeInTheDocument()

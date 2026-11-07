@@ -5,7 +5,7 @@ import App from '../App.tsx'
 import type { Team, TeamMember } from '../domain/team.ts'
 import { TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
 import { detailHandlers, listHandlers } from '../test/handlers.ts'
-import { renderWithProviders } from '../test/render.tsx'
+import { renderWithProviders, waitForPageToLoad } from '../test/render.tsx'
 import { server } from '../test/server.ts'
 
 const ID_RAIN = '6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
@@ -63,7 +63,7 @@ describe('adding from a Pokémon’s page', () => {
     expect(screen.getByLabelText('Add Pokémon to:')).toHaveDisplayValue('Rain team (1/6)')
 
     await user.click(screen.getByRole('link', { name: 'View Rain team' }))
-    expect(screen.getByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rain team' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3, name: 'eevee' })).toBeInTheDocument()
   })
 
@@ -75,6 +75,7 @@ describe('adding from a Pokémon’s page', () => {
     // Like a reload: a fresh app reading the same localStorage
     first.unmount()
     renderWithProviders(<App />, { url: `/teams/${ID_RAIN}` })
+    await waitForPageToLoad()
 
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['rattata', 'eevee'])
   })
@@ -121,6 +122,7 @@ describe('adding from a list card', () => {
     server.use(...listHandlers().handlers)
     server.use(...detailHandlers())
     renderWithProviders(<App />, { url: '/', storedTeams: [rain(), SUN] })
+    await waitForPageToLoad()
     await screen.findAllByRole('article')
 
     await user.selectOptions(screen.getByLabelText('Add Pokémon to:'), 'Sun team (0/6)')
@@ -190,7 +192,7 @@ describe('when adding isn’t possible', () => {
     expect(screen.queryByRole('button', { name: /^Add to/ })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Create a team first' }))
-    expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Teams' })).toBeInTheDocument()
   })
 
   it('with no teams, the Pokémon’s page links to the Teams page too', async () => {

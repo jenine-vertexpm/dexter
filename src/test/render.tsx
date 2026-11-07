@@ -1,7 +1,8 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
-import { render } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
+import { expect } from 'vitest'
 import type { Team } from '../domain/team.ts'
 import { createQueryClient } from '../queries/queryClient.ts'
 import { saveTeams, TEAMS_STORAGE_KEY } from '../storage/teamStorage.ts'
@@ -46,4 +47,10 @@ export function renderWithProviders(
       </QueryClientProvider>,
     ),
   }
+}
+
+// Pages are loaded on demand (see App.tsx), so right after rendering <App /> a page may still
+// show "Loading page…". Tests that render <App /> call this to wait until the page is there.
+export async function waitForPageToLoad() {
+  await waitFor(() => expect(screen.queryByText('Loading page…')).not.toBeInTheDocument())
 }

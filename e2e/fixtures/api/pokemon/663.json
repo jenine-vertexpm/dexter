@@ -1,0 +1,98 @@
+{
+  "status": 200,
+  "body": {
+    "id": 663,
+    "name": "talonflame",
+    "height": 12,
+    "weight": 245,
+    "types": [
+      {
+        "slot": 1,
+        "type": {
+          "name": "fire",
+          "url": "https://pokeapi.co/api/v2/type/10/"
+        }
+      },
+      {
+        "slot": 2,
+        "type": {
+          "name": "flying",
+          "url": "https://pokeapi.co/api/v2/type/3/"
+        }
+      }
+    ],
+    "stats": [
+      {
+        "base_stat": 78,
+        "stat": {
+          "name": "hp",
+          "url": "https://pokeapi.co/api/v2/stat/1/"
+        }
+      },
+      {
+        "base_stat": 81,
+        "stat": {
+          "name": "attack",
+          "url": "https://pokeapi.co/api/v2/stat/2/"
+        }
+      },
+      {
+        "base_stat": 71,
+        "stat": {
+          "name": "defense",
+          "url": "https://pokeapi.co/api/v2/stat/3/"
+        }
+      },
+      {
+        "base_stat": 74,
+        "stat": {
+          "name": "special-attack",
+          "url": "https://pokeapi.co/api/v2/stat/4/"
+        }
+      },
+      {
+        "base_stat": 69,
+        "stat": {
+          "name": "special-defense",
+          "url": "https://pokeapi.co/api/v2/stat/5/"
+        }
+      },
+      {
+        "base_stat": 126,
+        "stat": {
+          "name": "speed",
+          "url": "https://pokeapi.co/api/v2/stat/6/"
+        }
+      }
+    ],
+    "abilities": [
+      {
+        "is_hidden": false,
+        "slot": 1,
+        "ability": {
+          "name": "flame-body",
+          "url": "https://pokeapi.co/api/v2/ability/49/"
+        }
+      },
+      {
+        "is_hidden": true,
+        "slot": 3,
+        "ability": {
+          "name": "gale-wings",
+          "url": "https://pokeapi.co/api/v2/ability/177/"
+        }
+      }
+    ],
+    "sprites": {
+      "other": {
+        "official-artwork": {
+          "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/663.png"
+        }
+      }
+    },
+    "species": {
+      "name": "talonflame",
+      "url": "https://pokeapi.co/api/v2/pokemon-species/663/"
+    }
+  }
+}

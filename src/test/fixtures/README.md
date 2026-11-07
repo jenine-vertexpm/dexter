@@ -20,3 +20,17 @@ Real PokéAPI responses, fetched on 2026-10-29 and trimmed so tests stay small a
 | `type-normal.json` | A single type: 2× from fighting, 0× from ghost. Fetched 2026-11-04. |
 | `type-bug.json`, `type-steel.json` | Together give 4× (fire), ¼× (grass) and 0× (poison) against Scizor |
 | `type-psychic.json` | Deoxys’s type, for the team analysis: 2× from bug, ghost and dark. Fetched 2026-11-06. |
+
+## Team files (`team-files/`)
+
+Hand-made team files for the import tests (M3 plan T10). They also work for trying import by hand.
+
+| File | Expected result |
+|---|---|
+| `rain-team.json` | Imports: "Rain team" with pikachu (Sparky), eevee, deoxys (Space Rock) |
+| `markup-name.json` | Imports: the name `<img src=x onerror=alert(1)>` is shown as text |
+| `not-json.json` | Rejected: not valid JSON |
+| `newer-version.json` | Rejected: made by a newer version (version 2) |
+| `seven-members.json` | Rejected: more than 6 Pokémon |
+| `bad-nickname.json` | Rejected: nickname `Sparky!` has punctuation |
+| `unknown-species.json` | Rejected: `pikachuu` and `pikachu-gmax` aren't species |

@@ -1,0 +1,17 @@
+{
+  "format": "dexter-team",
+  "version": 1,
+  "team": {
+    "name": "Typo team",
+    "members": [
+      {
+        "species": "pikachuu",
+        "nickname": null
+      },
+      {
+        "species": "pikachu-gmax",
+        "nickname": null
+      }
+    ]
+  }
+}

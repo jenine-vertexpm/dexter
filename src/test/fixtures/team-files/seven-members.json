@@ -1,0 +1,37 @@
+{
+  "format": "dexter-team",
+  "version": 1,
+  "team": {
+    "name": "Too big",
+    "members": [
+      {
+        "species": "bulbasaur",
+        "nickname": null
+      },
+      {
+        "species": "ivysaur",
+        "nickname": null
+      },
+      {
+        "species": "venusaur",
+        "nickname": null
+      },
+      {
+        "species": "charmander",
+        "nickname": null
+      },
+      {
+        "species": "charmeleon",
+        "nickname": null
+      },
+      {
+        "species": "charizard",
+        "nickname": null
+      },
+      {
+        "species": "squirtle",
+        "nickname": null
+      }
+    ]
+  }
+}

@@ -28,6 +28,10 @@ dist-ssr
 .env.*
 !.env.example
 
+# Playwright reports and failure traces (npm run e2e)
+playwright-report
+test-results
+
 # TypeScript build cache
 *.tsbuildinfo
 

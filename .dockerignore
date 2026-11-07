@@ -21,3 +21,8 @@ logs
 Dockerfile
 .dockerignore
 compose.yaml
+
+# End-to-end tests and their reports run outside the image
+e2e
+playwright-report
+test-results

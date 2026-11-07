@@ -1,0 +1,99 @@
+{
+  "status": 200,
+  "body": {
+    "id": 24,
+    "name": "arbok",
+    "height": 35,
+    "weight": 650,
+    "types": [
+      {
+        "slot": 1,
+        "type": {
+          "name": "poison",
+          "url": "https://pokeapi.co/api/v2/type/4/"
+        }
+      }
+    ],
+    "stats": [
+      {
+        "base_stat": 60,
+        "stat": {
+          "name": "hp",
+          "url": "https://pokeapi.co/api/v2/stat/1/"
+        }
+      },
+      {
+        "base_stat": 95,
+        "stat": {
+          "name": "attack",
+          "url": "https://pokeapi.co/api/v2/stat/2/"
+        }
+      },
+      {
+        "base_stat": 69,
+        "stat": {
+          "name": "defense",
+          "url": "https://pokeapi.co/api/v2/stat/3/"
+        }
+      },
+      {
+        "base_stat": 65,
+        "stat": {
+          "name": "special-attack",
+          "url": "https://pokeapi.co/api/v2/stat/4/"
+        }
+      },
+      {
+        "base_stat": 79,
+        "stat": {
+          "name": "special-defense",
+          "url": "https://pokeapi.co/api/v2/stat/5/"
+        }
+      },
+      {
+        "base_stat": 80,
+        "stat": {
+          "name": "speed",
+          "url": "https://pokeapi.co/api/v2/stat/6/"
+        }
+      }
+    ],
+    "abilities": [
+      {
+        "is_hidden": false,
+        "slot": 1,
+        "ability": {
+          "name": "intimidate",
+          "url": "https://pokeapi.co/api/v2/ability/22/"
+        }
+      },
+      {
+        "is_hidden": false,
+        "slot": 2,
+        "ability": {
+          "name": "shed-skin",
+          "url": "https://pokeapi.co/api/v2/ability/61/"
+        }
+      },
+      {
+        "is_hidden": true,
+        "slot": 3,
+        "ability": {
+          "name": "unnerve",
+          "url": "https://pokeapi.co/api/v2/ability/127/"
+        }
+      }
+    ],
+    "sprites": {
+      "other": {
+        "official-artwork": {
+          "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/24.png"
+        }
+      }
+    },
+    "species": {
+      "name": "arbok",
+      "url": "https://pokeapi.co/api/v2/pokemon-species/24/"
+    }
+  }
+}

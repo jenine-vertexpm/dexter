@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 // https://vitest.dev/config/
@@ -9,5 +9,7 @@ export default defineConfig({
     // A simulated browser page, so components can render inside Node
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // e2e/ holds the Playwright browser tests (npm run e2e); Vitest must not pick them up
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

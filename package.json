@@ -10,6 +10,7 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke": "vitest run --config vitest.smoke.config.ts",
     "preview": "vite preview",
     "e2e": "playwright test",
     "e2e:record": "node --experimental-strip-types e2e/record.ts"

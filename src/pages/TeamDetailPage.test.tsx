@@ -190,23 +190,23 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
   it('disables Move up for the first member and Move down for the last', async () => {
     await renderTeam()
 
-    expect(screen.getByRole('button', { name: 'Move deoxys up' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Move deoxys down' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Move eevee up' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Move eevee down' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Move pikachu up' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Move pikachu down' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move up (deoxys)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move down (deoxys)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move up (eevee)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move down (eevee)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move up (pikachu)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move down (pikachu)' })).toBeDisabled()
   })
 
   it('moves a member up one place, saves, keeps focus on its button and announces the position', async () => {
     const user = userEvent.setup()
     await renderTeam()
 
-    await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
+    await user.click(screen.getByRole('button', { name: 'Move up (pikachu)' }))
 
     expect(shownSpecies()).toEqual(['deoxys', 'pikachu', 'eevee'])
     expect(storedMembers().map((member) => member.species)).toEqual(['deoxys', 'pikachu', 'eevee'])
-    expect(screen.getByRole('button', { name: 'Move pikachu up' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Move up (pikachu)' })).toHaveFocus()
     expect(screen.getByRole('status')).toHaveTextContent('pikachu moved to position 2 of 3.')
   })
 
@@ -214,12 +214,12 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
     const user = userEvent.setup()
     await renderTeam()
 
-    screen.getByRole('button', { name: 'Move deoxys down' }).focus()
+    screen.getByRole('button', { name: 'Move down (deoxys)' }).focus()
     await user.keyboard('{Enter}')
 
     expect(shownSpecies()).toEqual(['eevee', 'deoxys', 'pikachu'])
     expect(storedMembers().map((member) => member.species)).toEqual(['eevee', 'deoxys', 'pikachu'])
-    expect(screen.getByRole('button', { name: 'Move deoxys down' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Move down (deoxys)' })).toHaveFocus()
     expect(screen.getByRole('status')).toHaveTextContent('deoxys moved to position 2 of 3.')
   })
 
@@ -227,20 +227,20 @@ describe('TeamDetailPage: Move up and Move down (D16)', () => {
     const user = userEvent.setup()
     await renderTeam()
 
-    await user.click(screen.getByRole('button', { name: 'Move eevee up' }))
+    await user.click(screen.getByRole('button', { name: 'Move up (eevee)' }))
 
     expect(shownSpecies()).toEqual(['eevee', 'deoxys', 'pikachu'])
     // Move up is now disabled (eevee is first), so focus can't stay on it
-    expect(screen.getByRole('button', { name: 'Move eevee up' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Move eevee down' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Move up (eevee)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move down (eevee)' })).toHaveFocus()
     expect(screen.getByRole('status')).toHaveTextContent('eevee moved to position 1 of 3.')
   })
 
   it('keeps the new order after the app starts again', async () => {
     const user = userEvent.setup()
     const first = await renderTeam()
-    await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
-    await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
+    await user.click(screen.getByRole('button', { name: 'Move up (pikachu)' }))
+    await user.click(screen.getByRole('button', { name: 'Move up (pikachu)' }))
 
     // Like a reload: a fresh app reading the same localStorage
     first.unmount()
@@ -360,8 +360,8 @@ describe('TeamDetailPage: other states', () => {
 
     expect(screen.getByRole('heading', { name: 'Problem with your saved teams' })).toBeInTheDocument()
     for (const species of ['deoxys', 'eevee', 'pikachu']) {
-      expect(screen.getByRole('button', { name: `Move ${species} up` })).toBeDisabled()
-      expect(screen.getByRole('button', { name: `Move ${species} down` })).toBeDisabled()
+      expect(screen.getByRole('button', { name: `Move up (${species})` })).toBeDisabled()
+      expect(screen.getByRole('button', { name: `Move down (${species})` })).toBeDisabled()
       expect(screen.getByRole('button', { name: `Remove ${species}` })).toBeDisabled()
       expect(screen.getByLabelText(`Nickname for ${species}`)).toBeDisabled()
       expect(screen.getByRole('button', { name: `Save nickname for ${species}` })).toBeDisabled()
@@ -428,7 +428,7 @@ describe('TeamDetailPage: Export (T9)', () => {
     const downloads = stubDownloads()
     await renderTeam()
 
-    await user.click(screen.getByRole('button', { name: 'Move pikachu up' }))
+    await user.click(screen.getByRole('button', { name: 'Move up (pikachu)' }))
     await user.type(screen.getByLabelText('Nickname for pikachu'), 'Sparky')
     await user.click(screen.getByRole('button', { name: 'Save nickname for pikachu' }))
     await user.click(screen.getByRole('button', { name: 'Export team' }))

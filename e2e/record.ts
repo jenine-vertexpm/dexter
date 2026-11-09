@@ -6,13 +6,19 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { z } from 'zod'
-import { pokemonSchema, speciesIndexSchema } from '../src/api/schemas.ts'
+import {
+  evolutionChainSchema,
+  pokemonSchema,
+  speciesIndexSchema,
+  speciesSchema,
+  typeSchema,
+} from '../src/api/schemas.ts'
 import { API_ORIGIN, API_PREFIX, RECORDINGS_DIR, recordingFileFor, type Recording } from './recordings.ts'
 
 interface Wanted {
   path: string // after /api/v2/, exactly as the app requests it
   schema: z.ZodType
-  // A deliberate "not found" (none yet; later tests add them, e.g. a misspelt species)
+  // A deliberate "not found", e.g. a misspelt species
   expect404?: boolean
 }
 
@@ -22,6 +28,34 @@ const WANTED: Wanted[] = [
   // Journey 1, browse and paginate: the species index, then one Pokémon per card on pages 1 and 2
   { path: 'pokemon-species?limit=100000', schema: speciesIndexSchema },
   ...range(1, 40).map((id) => ({ path: `pokemon/${id}`, schema: pokemonSchema })),
+
+  // Journey 2, search: the cards for "char" beyond page 1 (chimchar, charjabug, charcadet, pecharunt)
+  ...[390, 737, 935, 1025].map((id) => ({ path: `pokemon/${id}`, schema: pokemonSchema })),
+
+  // Journey 3, filter: both types, and the cards with both that aren't on page 1
+  // (moltres, ho-oh, fletchinder, talonflame, oricorio)
+  ...['fire', 'flying'].map((name) => ({ path: `type/${name}`, schema: typeSchema })),
+  ...[146, 250, 662, 663, 741].map((id) => ({ path: `pokemon/${id}`, schema: pokemonSchema })),
+  // Ticking "fire" first shows page 1 of fire Pokémon for a moment, before "flying" is ticked
+  ...[37, 38, 58, 59, 77, 78, 126, 136, 155, 156, 157, 218, 219, 228, 229, 240].map((id) => ({
+    path: `pokemon/${id}`,
+    schema: pokemonSchema,
+  })),
+
+  // Journeys 4 and 5, detail pages: eevee (deep link, its branching chain, its type matchups),
+  // vaporeon (opened from the chain) and a misspelt name that must show not-found
+  { path: 'evolution-chain/67', schema: evolutionChainSchema },
+  { path: 'pokemon-species/pikachuu', schema: speciesSchema, expect404: true },
+
+  // Journeys 6–8, teams: the team page loads each member by species, then its default Pokémon.
+  // Species and Pokémon by name for every member and detail page above.
+  ...['bulbasaur', 'ivysaur', 'venusaur', 'charmander', 'charmeleon', 'charizard', 'squirtle', 'eevee', 'vaporeon']
+    .flatMap((name) => [
+      { path: `pokemon-species/${name}`, schema: speciesSchema },
+      { path: `pokemon/${name}`, schema: pokemonSchema },
+    ]),
+  // The members' types, for the detail pages' type matchups and the team analysis
+  ...['normal', 'grass', 'poison', 'water'].map((name) => ({ path: `type/${name}`, schema: typeSchema })),
 ]
 
 // A pause between requests, to be polite to a free public API

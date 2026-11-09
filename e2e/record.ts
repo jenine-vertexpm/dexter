@@ -56,6 +56,9 @@ const WANTED: Wanted[] = [
     ]),
   // The members' types, for the detail pages' type matchups and the team analysis
   ...['normal', 'grass', 'poison', 'water'].map((name) => ({ path: `type/${name}`, schema: typeSchema })),
+
+  // Request budget (H7): bulbasaur's page, opened from list page 1, also loads its chain
+  { path: 'evolution-chain/1', schema: evolutionChainSchema },
 ]
 
 // A pause between requests, to be polite to a free public API

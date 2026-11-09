@@ -23,5 +23,6 @@ Real PokéAPI answers for the Playwright tests (M4 plan §5.2, D20). During `npm
 | `api/pokemon-species/pikachuu.json` | 2026-11-07 | **404**: a misspelt name must show the not-found page (journey 4) |
 | `api/pokemon-species/<name>.json`, `api/pokemon/<name>.json` | 2026-11-07 | bulbasaur, ivysaur, venusaur, charmander, charmeleon, charizard, squirtle, eevee, vaporeon. The detail pages (journeys 4, 5) and team members (journeys 6–8) load a species, then its default Pokémon by name |
 | `api/type/normal.json`, `grass`, `poison`, `water` | 2026-11-07 | Type matchups on the detail pages, and the team analysis (journeys 4–8) |
+| `api/evolution-chain/1.json` | 2026-11-09 | Bulbasaur's chain: the request-budget test opens bulbasaur from list page 1, then goes Back (H7). Re-recording everything that day changed no other file |
 
 Species files are the largest (about 48 KB each), because they keep every language's flavour text: the schema reads the whole list and the app picks one entry.

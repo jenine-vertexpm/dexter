@@ -1,0 +1,49 @@
+name: API smoke test
+
+# Checks daily that the REAL PokéAPI still matches what Dexter relies on (M4 plan H9, §5.4, D27).
+# The normal CI uses recorded answers, so it can't notice a change in the live API; this can.
+#
+# It never runs on pull requests, so it can't be a required check and a PokéAPI outage can never
+# block a merge. A failure shows as a red run in the Actions tab and sends a notification:
+# - for the daily run, to whoever last changed the `cron:` line below (GitHub Docs);
+# - for a manual run, to whoever pressed "Run workflow".
+# Whether that's an email depends on that person's GitHub setting:
+# Settings → Notifications → System → Actions.
+on:
+  schedule:
+    # Every day at 05:23 UTC (07:23 in South Africa). Not on the hour, when GitHub's scheduler is
+    # busiest and runs are more often delayed.
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force_failure:
+        description: 'Fail on purpose after the smoke test, to check the failure notification arrives'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Smoke test against the live PokéAPI
+        run: npm run smoke
+
+      # "Test the alarm": only when ticked in a manual run (a daily run has no inputs, so it's off).
+      # The smoke test above still runs normally; this extra step then fails the run on purpose.
+      - name: Fail on purpose (force_failure)
+        if: ${{ inputs.force_failure }}
+        run: |
+          echo "::error title=Deliberate failure::force_failure was ticked. This run fails on purpose to test the failure notification. The smoke test itself passed."
+          exit 1

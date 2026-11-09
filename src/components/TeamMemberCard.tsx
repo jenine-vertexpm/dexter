@@ -88,13 +88,14 @@ export function TeamMemberCard({
         </div>
       </div>
 
-      {/* The visible text is short; aria-label names the Pokémon, so a screen reader doesn't
-          hear six identical "Move up" buttons */}
+      {/* The visible text is short; aria-label adds the Pokémon, so a screen reader doesn't
+          hear six identical "Move up" buttons. The visible words come first ("Move up (eevee)"),
+          so someone using voice control can say what they see (axe: label-content-name-mismatch) */}
       <div className="team-member-actions">
         <button
           ref={(button) => moveButtonRef('up', button)}
           type="button"
-          aria-label={`Move ${species} up`}
+          aria-label={`Move up (${species})`}
           disabled={disabled || position === 0}
           onClick={() => onMove('up')}
         >
@@ -103,7 +104,7 @@ export function TeamMemberCard({
         <button
           ref={(button) => moveButtonRef('down', button)}
           type="button"
-          aria-label={`Move ${species} down`}
+          aria-label={`Move down (${species})`}
           disabled={disabled || position === teamSize - 1}
           onClick={() => onMove('down')}
         >

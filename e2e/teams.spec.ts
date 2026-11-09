@@ -74,7 +74,7 @@ test('export a team, delete it, import the file: the same team comes back', asyn
   await page.getByRole('article', { name: 'squirtle' }).getByRole('link', { name: 'View Rain team' }).click()
   await page.getByLabel('Nickname for charmander').fill('Blaze')
   await page.getByRole('button', { name: 'Save nickname for charmander' }).click()
-  await page.getByRole('button', { name: 'Move squirtle up' }).click()
+  await page.getByRole('button', { name: 'Move up (squirtle)' }).click()
   const order = ['bulbasaur', 'squirtle', 'charmander']
   await expect(memberNames(page)).toHaveText(order)
 

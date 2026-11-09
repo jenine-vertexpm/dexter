@@ -1,0 +1,52 @@
+# Dependabot version updates (M4 plan H8, D23): once a week, Dependabot checks for newer versions
+# and opens pull requests. Each PR runs the full CI (including Trivy and the E2E tests) and is
+# merged only after review, like any other change.
+#
+# Grouping keeps the noise down: minor and patch updates arrive together in one PR per group.
+# Major updates are left out of the groups, so each arrives in a PR of its own, because they can
+# contain breaking changes and deserve a separate look.
+#
+# Security updates (PRs for a known vulnerability) are a separate GitHub setting, "Dependabot
+# security updates". They arrive as soon as a fix exists, not weekly. See docs/vulnerability-triage.md.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-runtime:
+        patterns: ['*']
+        dependency-type: production
+        update-types: [minor, patch]
+      npm-development:
+        patterns: ['*']
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # The two base images in the Dockerfile: node (build stage) and nginx-unprivileged (served image)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      docker-base-images:
+        patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      # Dexter is built and tested on Node 22 (README, CI). Moving to a new major Node version is
+      # a deliberate decision, not a weekly update.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']

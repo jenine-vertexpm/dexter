@@ -185,3 +185,4 @@ This project was built for a two-week AI-assisted React engineering challenge; t
 - [`docs/plans/M2.md`](docs/plans/M2.md) – M2 plan: browse and detail
 - [`docs/plans/M3.md`](docs/plans/M3.md) – M3 plan: teams (decisions D8–D18, storage format, team file format and import rules)
 - [`docs/plans/M4.md`](docs/plans/M4.md) – M4 plan: hardened (decisions D19–D29: E2E, headers and CSP, scanning, smoke test)
+- [`docs/plans/M5.md`](docs/plans/M5.md) – M5 plan: deployed (decisions D30–D38: hosting on Render Free with a Blueprint, runtime config, publishing and deploying the same image)

@@ -134,7 +134,8 @@ All three are listed in section 6.
 
 **Why it mostly doesn't apply:**
 
-- Dexter has no passwords, tokens, keys, payment or personal data to encrypt. The only stored data is team names, species and nicknames, in the visitor's own browser.
+- Dexter has no passwords, tokens, keys or payment data to encrypt, and it **never asks for personal information**. The only stored data is team names, species and nicknames, in the visitor's own browser.
+- Team names and nicknames are free text, though, so a visitor **may choose** to type something personal into them (a real name, for example). That stays in their own browser, unencrypted, and is never sent anywhere by Dexter. See the `localStorage` limitation in section 6.
 - Team ids come from `crypto.randomUUID()` ([`src/domain/team.ts`](src/domain/team.ts)). They're unique labels, not secrets, and nothing depends on them being unguessable.
 
 **The part that does apply, transport:**
@@ -154,7 +155,9 @@ All three are listed in section 6.
 2. **No way around that.**
    - `dangerouslySetInnerHTML` is banned by the lint rule `react/no-danger` ([`.oxlintrc.json`](.oxlintrc.json)), which fails CI.
    - There is no `innerHTML`, `eval` or `new Function` in `src/`.
-3. **The CSP blocks scripts even if markup got in.** `script-src 'self'` has no `'unsafe-inline'` and no `'unsafe-eval'`, so injected inline scripts and event handlers wouldn't run. zod is set to `jitless`, so it never tries `eval` ([`src/lib/zodConfig.ts`](src/lib/zodConfig.ts)).
+3. **The CSP is a safety net if markup ever got in.** `script-src 'self'` has no `'unsafe-inline'` and no `'unsafe-eval'`. So if an attacker's markup did reach the page, the browser would refuse to run an inline `<script>` block, an event-handler attribute such as `onerror="…"`, a `javascript:` link, or code built from text with `eval`; and it would refuse to load a script from any other site. zod is set to `jitless`, so Dexter itself never needs `eval` ([`src/lib/zodConfig.ts`](src/lib/zodConfig.ts)).
+
+   **What the CSP does not do:** it doesn't prevent every XSS bug. It only allows or blocks *where code and data come from*. It can't stop a bug in Dexter's own JavaScript from misusing data, and it can't stop markup being injected in the first place (it limits what that markup can do). That's why layers 1 and 2 come first, and the CSP is the backstop.
 4. **Values placed in addresses are encoded.** Names are URL-encoded before they're sent to PokéAPI ([`src/api/client.ts`](src/api/client.ts)). An export's file name is reduced to letters, numbers and dashes (`teamFileName` in [`src/domain/teamFile.ts`](src/domain/teamFile.ts)).
 
 **Evidence:**
@@ -274,7 +277,7 @@ They're set in [`nginx/security-headers.conf`](nginx/security-headers.conf) and 
 
 | Header | Value | What it does |
 |---|---|---|
-| `Content-Security-Policy` | see below | Lists the only places the page may load anything from. Anything else is blocked, even if an attacker got markup into the page. |
+| `Content-Security-Policy` | see below | Lists the only places the page may load anything from, and forbids inline scripts, event-handler attributes and `eval`. A second line of defence against XSS, not a replacement for showing data as text (A05). |
 | `Strict-Transport-Security` | `max-age=31536000` | Once a browser has seen Dexter over HTTPS, it uses only HTTPS for it for a year. Ignored over plain `http://localhost`. No `includeSubDomains` or `preload`: we won't own the parent domain of the M5 address. |
 | `X-Content-Type-Options` | `nosniff` | The browser must trust the file type the server sends rather than guess from the contents, so a file can't be passed off as a script. |
 | `X-Frame-Options` | `DENY` | Older browsers' way of saying "never show this site inside a frame" (against clickjacking). |
@@ -286,17 +289,17 @@ They're set in [`nginx/security-headers.conf`](nginx/security-headers.conf) and 
 | Rule | Allows | Why |
 |---|---|---|
 | `default-src 'none'` | nothing, unless a rule below says otherwise | Start from "block everything" |
-| `script-src 'self'` | only Dexter's own JavaScript files | No inline scripts, no `eval`: injected code can't run |
+| `script-src 'self'` | only Dexter's own JavaScript files | Injected inline `<script>` blocks, event handlers (`onerror=…`), `javascript:` links and `eval` are refused, and scripts from other sites can't load |
 | `style-src 'self'` | only Dexter's own CSS files | The stat bars set their width through JavaScript, which this allows |
 | `img-src 'self' https://raw.githubusercontent.com` | the favicon and the official artwork | The daily smoke test warns if PokéAPI moves its artwork elsewhere |
-| `connect-src https://pokeapi.co` | data requests to PokéAPI only | Even injected code couldn't send data anywhere else |
+| `connect-src https://pokeapi.co` | data requests to PokéAPI only | Dexter's code can't send data to any other address with `fetch`, which also limits what a bug could leak |
 | `base-uri 'none'` | no `<base>` tag | Stops relative links being redirected |
 | `form-action 'none'` | no form submitting to any address | Dexter's forms are handled in JavaScript and never submit |
 | `frame-ancestors 'none'` | no site may frame Dexter | Against clickjacking |
 
 ## 5. Dependencies and how findings are triaged
 
-How vulnerabilities are found and handled is set out in full in [`docs/vulnerability-triage.md`](docs/vulnerability-triage.md) (written in M4 H8; the CI and Dependabot files point to it). In short:
+How vulnerabilities are found and handled is set out in full in [`docs/vulnerability-triage.md`](docs/vulnerability-triage.md), which stays the **single source of truth** for the policy. (The M4 plan said the policy would move into this file. It deliberately stays where it is: the CI and Dependabot files point to it, and keeping one full copy means the two can't drift apart.) In short:
 
 - **Found by:**
   - Trivy, in CI on every pull request (the image and `package-lock.json`);
@@ -322,7 +325,7 @@ How vulnerabilities are found and handled is set out in full in [`docs/vulnerabi
 | Limitation | Why it matters | What limits the risk today | Status |
 |---|---|---|---|
 | **No React error boundary** | An unexpected render bug, or a failed download of a page's code, leaves a blank page with no message (A10) | Rare. Known API and storage failures all have error states. Reloading fixes a failed download. | Open. Out of M4 scope (M4 plan §11); a small change if wanted. |
-| **`localStorage` is readable by anyone with access to the device, and by any script running on Dexter's origin** | Saved teams aren't private or encrypted | They hold only team names, species and nicknames, nothing sensitive. The CSP allows only Dexter's own scripts. | Accepted |
+| **`localStorage` is readable by anyone with access to the device, and by any script running on Dexter's origin** | Saved teams aren't private or encrypted | Dexter never asks for personal information; teams hold only team names, species and nicknames. But those are free text, so a visitor may type something personal into them, and anyone using the same device could read it. The data never leaves the device unless the visitor exports a file. The CSP allows only Dexter's own scripts. | Accepted |
 | **The development server has no CSP or security headers** | A change that breaks the CSP isn't visible in `npm run dev` | The E2E tests run against the production container, with the real headers, on every PR | Accepted (M4 plan D21) |
 | **HSTS only works over HTTPS** | Locally, over `http://localhost`, browsers ignore it | Dexter isn't deployed yet | Takes effect with HTTPS deployment in M5 |
 | **Headers aren't yet checked on a deployed site** | The brief asks for header checks on the deployed site in CI | `e2e/headers.spec.ts` takes `E2E_BASE_URL`, ready to point at the deployment | M5 |
@@ -335,10 +338,14 @@ How vulnerabilities are found and handled is set out in full in [`docs/vulnerabi
 
 ## 7. Reporting a vulnerability
 
-Please report security problems **privately**, not in a public issue:
+Please report security problems **privately**, not in a public issue. Dexter uses GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability). You need to be signed in to GitHub.
 
-1. Go to the repository's **Security** tab.
-2. Click **Report a vulnerability**. This uses GitHub's private vulnerability reporting, so only the maintainer sees it.
-3. Describe the problem, how to reproduce it, and what an attacker could do with it.
+1. Go to the repository's main page on GitHub.
+2. Under the repository name, click the **Security and quality** tab. If you can't see it, open the **⋯** menu and choose **Security and quality** there.
+3. Click **Report a vulnerability**.
+4. Fill in the form: a summary, the details, how to reproduce it (proof of concept), and what an attacker could do with it (impact).
+5. Click **Submit report**.
+
+The report goes privately to the repository's maintainer, not to the public. GitHub adds you to the draft advisory as a collaborator, so the conversation about it stays private too.
 
 Dexter is a learning project maintained by one person. There is no bug bounty and no guaranteed response time, but every report will be read and answered. Only the latest version on `main` is supported.

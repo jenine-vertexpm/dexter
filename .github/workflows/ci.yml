@@ -34,6 +34,10 @@ jobs:
   # (M4 plan D19, D24). PokéAPI answers come from e2e/fixtures/api/, so this job never calls the live API.
   image-and-e2e:
     runs-on: ubuntu-latest
+    env:
+      # Trivy's official image, pinned by digest (v0.76.1, M4 plan D23). Dependabot can't update a
+      # digest inside a `docker run`, so this is updated by hand: see docs/vulnerability-triage.md.
+      TRIVY_IMAGE: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -46,6 +50,27 @@ jobs:
 
       - name: Build the production image
         run: docker build --tag dexter:ci .
+
+      # Vulnerability scanning with Trivy (M4 plan D23), before the image is tested.
+      # - The image is handed to Trivy as a file, so Trivy never gets control of Docker itself.
+      # - `-w /scan` lets Trivy find a .trivyignore (written exceptions with reasons) if there is one.
+      # - Each target is scanned twice. The report lists every finding, fixable or not, and never
+      #   fails. The gate fails the job on HIGH or CRITICAL findings that have a fix available.
+      # - package-lock.json includes dev dependencies: they run here in CI and in the image build.
+      - name: Save the image to a file for scanning
+        run: docker save --output dexter-image.tar dexter:ci
+
+      - name: "Trivy report: the image (every finding)"
+        run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" image --input dexter-image.tar
+
+      - name: "Trivy report: package-lock.json (every finding)"
+        run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" fs --scanners vuln --include-dev-deps package-lock.json
+
+      - name: "Trivy gate: the image (fails on fixable HIGH/CRITICAL)"
+        run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" image --input dexter-image.tar --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+
+      - name: "Trivy gate: package-lock.json (fails on fixable HIGH/CRITICAL)"
+        run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" fs --scanners vuln --include-dev-deps package-lock.json --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
 
       - name: Start the container
         run: docker run --detach --name dexter --publish 8080:8080 dexter:ci

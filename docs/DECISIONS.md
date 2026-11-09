@@ -85,46 +85,8 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What I changed and why:** Accepted the approach and asked for a safeguard on the id assumption. 
 **What I did not understand at first:** , I didn’t understand that the app would fetch one list of species names and URLs, search that list locally, and fetch full details only for the Pokémon shown on the current page.
 
-## 2026-10-29 - Type matchups: fixed 18 battle types, current damage relations
-**Context:** The detail page must show, for every attacking type, the damage multiplier against this Pokémon, and only types that exist in battle.
-**What I asked the AI:** How to interpret "type matchups" from the brief.
-**What it gave me:**
-- The brief means *defensive* multipliers (0, ¼, ½, 1, 2, 4). We calculate them from the Pokémon's 1–2 types using each type's `damage_relations` (`double_damage_from` ×2, `half_damage_from` ×½, `no_damage_from` ×0), multiplied together for dual types.
-- `/type` returns 21 types. `stellar` and `shadow` have no damage relations and no Pokémon, and `unknown` isn't a battle type either.
-- It offered two choices: a fixed list of battle types, or working the list out from the data.
-**Verified against:** live `/type?limit=100`, `/type/fire`, `/type/stellar`, `/type/shadow` on 2026-10-29. The docs describe `damage_relations` and `past_damage_relations` (older generations).
-**What I changed and why:** I chose a fixed list of the 18 battle types and current `damage_relations` only (not `past_damage_relations`). I excluded effects that depend on abilities (e.g. Levitate). Individual Pokémon results are never hardcoded. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
 
-## 2026-10-29 - Search and browser history
-**Context:** Search, filter and page live in the URL and must survive reloads and the Back button.
-**What I asked the AI:** How the URL history should behave while typing.
-**What it gave me:** One option: typing replaces the current history entry, and page and filter changes add new entries.
-**What I changed and why:** Chose that. Typing replaces the current URL entry, so Back isn't one step per letter. Page and type-filter changes add an entry, and Back/Forward restore the list state from the URL. The search box reads its value straight from the URL, so there is one source of truth. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
 
-## 2026-10-29 - Detail route takes species names
-**Context:** `/pokemon/:name` must work for every species, and evolution-chain entries link to species names.
-**What I asked the AI:** What names the detail route should accept.
-**What it gave me:** Option to accept species names only, with anything else showing not-found.
-**What I changed and why:** Chose species names. Each one is resolved to the species' default variety: `/pokemon-species/{name}`, then the variety with `is_default`, then that Pokémon. So `deoxys` shows `deoxys-normal`. Unknown names (`pikachuu`) and form names (`pikachu-gmax`) show the not-found view. TODO: why, in your own words.
-**Verified against:** live status codes on 2026-10-29: `/pokemon/deoxys` 404, `/pokemon/386` 200, `/pokemon-species/deoxys` 200, `/pokemon-species/deoxys-normal` 404, `/pokemon-species/pikachuu` 404.
-**What I did not understand at first:** TODO: fill in yourself.
-
-## 2026-10-29 - PokéAPI data surprises found while planning M2
-**Context:** The brief asks for at least three things about the API's data that surprised me, and what I did about each. These were found while checking real responses for the M2 plan.
-**What I asked the AI:** Check the API details the plan relies on against the docs and real responses.
-**What it gave me:**
-1. **A species name is not always a Pokémon name.** *(Observed)* For 37 species, the default Pokémon has a different name: `deoxys` → `deoxys-normal`, `giratina` → `giratina-altered`, `shaymin` → `shaymin-land`. `/pokemon/deoxys` returns 404. *What we do:* the detail route goes species → default variety, and list cards load by id.
-2. **Type lists include alternate forms.** *(Observed)* `/type/fire` lists 109 Pokémon, 28 of them alternate forms (ids above 10000). *What we do:* map type members to species and drop forms.
-3. **The type list includes types that aren't used in battle.** *(Observed)* `/type` returns 21 types, including `stellar`, `shadow` (empty damage relations, no Pokémon) and `unknown`. *What we do:* use a fixed list of 18 battle types.
-4. **Flavour text is raw.** *(Documented: "unprocessed", contains special characters)* Eevee's English text contains `\n` and `\f` line breaks. There are 33 English entries for eevee alone. *What we do:* pick one English entry and clean it in the mapping layer.
-5. **Evolution chains are trees, not lines.** *(Documented: `evolves_to` is a list; observed: eevee branches 8 ways)* *What we do:* map to a tree and render branches.
-6. **Species id = default Pokémon id is not guaranteed.** *(Observed for all 1025 species, not documented: an assumption)* *What we do:* the safeguards in the search/filter entry above.
-
-**Verified against:** pokeapi.co/docs/v2 and live responses on 2026-10-29 (endpoints listed in `docs/plans/M2.md` §9).
-**What I changed and why:** TODO: fill in yourself.
-**What I did not understand at first:** TODO: fill in yourself.
 
 ## 2026-10-29 - Offline: show an error with retry, not an endless loading state
 **Context:** Step S5 (TanStack Query, PR #11). The brief asks for offline to be handled deliberately, and every error state must offer a retry. The plan left the offline behaviour to be decided in S5, after reading TanStack's network-mode docs.
@@ -141,29 +103,15 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 - TanStack Query docs, "Network Mode" guide: in `'online'` mode a query that cannot fetch stays in its state with `fetchStatus: 'paused'`; in `'always'` mode *"your Query will go to `error` state if it fails"*.
 - The installed package's type definitions (`@tanstack/query-core` 5.105.0): `networkMode` *"@defaultValue 'online'"*.
 - Tests in `src/queries/pokeApiQueries.test.tsx` and `queryClient.test.ts`: offline shows an error immediately, is not paused, and makes one request. Switching back to `'online'` makes that test fail.
-**What I changed and why:** Accepted (merged in PR #11). TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Accepted 
+**What I did not understand at first:** I didn't understand how offline requests were handled by the data-fetching library, or that its default behaviour could leave the application in a perpetual loading state. I hadn't realised that handling offline scenarios required a deliberate decision about how requests should behave when an internet connection is unavailable.
 
-## 2026-11-03 - Search history: one entry per search, not one per keystroke
-**Context:** Step S7 (search, PR #14). This refines the "Search and browser history" entry above (plan decision D6), which said typing replaces the current history entry. The S7 acceptance criterion says that after typing several letters, Back goes to the state *before* the search started. If every keystroke replaced the entry, the first one included, that earlier state (for example page 2) would be overwritten, and Back would skip past it.
-**What I asked the AI:** Implement S7 using replace navigation while typing, and meet the plan's acceptance criteria. It pointed out the conflict and asked me to choose between "always replace" and "add one entry, then replace".
-**What it gave me:**
-- **The rule:** the first change in a new search (empty box → text) adds one browser history entry. Later keystrokes replace that entry instead of adding more. Editing a search that is already in the box counts as the same search, so it also replaces.
-- **Back and Forward:** Back after searching restores the exact list state from before the search began, such as the page it was on. Forward restores the search.
-- **Unchanged from D6:** typing never adds one entry per letter, and page and type-filter changes still add an entry.
-- **Where:** `changeSearch` in `src/pages/PokemonListPage.tsx` replaces unless the search was empty before.
-**Verified against:**
-- Tests in `src/pages/PokemonListPage.test.tsx` (`search`): on page 2, typing `pik` then one Back returns to `?page=2`. A search, then the next page, then Back restores the search on page 1. Making every keystroke replace made the first test fail.
-- Manual check in the browser after merging PR #14: typing, Back and Forward, and the Network tab all behaved as expected.
-**What I changed and why:** Chose "add one entry, then replace", so the user can undo an entire search with one Back action, rather than navigating backwards through individual keystrokes.
-**What I did not understand at first:** TODO: fill in yourself.
 
 ## 2026-11-04 - Team state: React Context + useReducer, separate from API data
 **Context:** M3 adds teams, the first state that I own rather than data from PokéAPI. The brief asks me to keep API data separate from user state and to justify how each is managed.
 **What I asked the AI:** While planning M3, to identify the decisions M3 needs and recommend options. For this one: where team state should live and how components read and change it.
 **What it gave me:** Four options: React Context + useReducer; a small external store read with useSyncExternalStore; Zustand with its persist middleware (a new dependency); and keeping teams in TanStack Query, which it advised against because it mixes user state into the API cache. It recommended Context + useReducer, with the reducer calling pure team functions and a separate storage module for loading and saving. That keeps the split clear: API data in TanStack Query, list settings in the URL, teams in a TeamsProvider.
-**Verified against (checked by the AI during planning):** react.dev useSyncExternalStore page ("When possible, we recommend using built-in React state with useState and useReducer instead").
-**What I changed and why:** Accepted Context + useReducer. I prefer using what is already built into React rather than adding a state-management library, and Context and useReducer seem right for this project without adding dependencies.
+**What I changed and why:** Accepted Context + useReducer. I prefer using what is already built into React rather than adding a state-management library.
 **What I did not understand at first:** Why teams needed a shared state mechanism at all. I now understand that several parts of the app (the list, the detail page and the team pages) need the same team data, so it makes sense to manage it in one shared place.
 
 ## 2026-11-04 - Teams are saved in localStorage
@@ -171,7 +119,7 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What I asked the AI:** Which browser storage to use, and how it can fail.
 **What it gave me:** localStorage (keeps data across browser sessions, stores text only, about 5 MiB per site, throws an error when storage is blocked or full, cleared after private windows close), IndexedDB (asynchronous, larger, more complex), and sessionStorage (lost when the tab closes). It recommended localStorage, with teams kept in memory and a notice shown if storage is blocked, and a notice suggesting export if a save fails.
 **Verified against (checked by the AI during planning):** MDN Window.localStorage; MDN "Storage quotas and eviction criteria".
-**What I changed and why:** Chose localStorage. It keeps teams between browser sessions and seems relatively straightforward to implement. IndexedDB looked like extra complexity this app doesn't need for the amount of data it stores.
+**What I changed and why:** Chose localStorage. It keeps teams between browser sessions and seems relatively straightforward to implement. IndexedDB looked like extra complexity.
 **What I did not understand at first:** The different browser storage options.
 
 ## 2026-11-04 - A team stores species names and nicknames; team ids are random UUIDs
@@ -180,21 +128,21 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What it gave me:** Store each member as a species name plus an optional nickname, and load types, stats and artwork from PokéAPI when needed (sharing the detail page's cache). It advised against storing copies of stats and types, because an edited or hostile file could carry false values. Team ids come from crypto.randomUUID(), which only works on secure pages (https and localhost).
 **Verified against (checked by the AI during planning):** MDN Crypto.randomUUID; MDN Secure contexts.
 **What I changed and why:** Accepted. My understanding is that we store a reference to the Pokémon and get the rest of its information from the existing API when needed, which avoids duplicating information.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I did not understand at first:** I hadn't realised that we needed to make a deliberate decision about whether user-created teams should persist when the page is refreshed or reopened, or where that information should be stored. Once the distinction between React state and local storage was explained, I understood the options.
 
 ## 2026-11-04 - Team names must be unique, ignoring capitalisation and spaces
 **Context:** The brief says team names are validated in the form and on import, but doesn't say what the rules are.
 **What I asked the AI:** Sensible rules for team names.
 **What it gave me:** Required after trimming spaces, 1 to 30 characters, no control characters, other characters allowed (React shows them as text, so markup is harmless). It recommended allowing duplicate names, because uniqueness isn't in the brief and it would make imports clash.
 **What I changed and why:** I changed this. Team names must be unique, because it doesn't make sense to have several teams with effectively the same name. Names count as the same regardless of capitalisation or surrounding spaces, so "Rain Team", "rain team" and " Rain Team " clash. The rule applies when creating, renaming and importing a team.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I did not understand at first:** I hadn't considered that the application would need rules for determining whether two team names should be treated as duplicates.
 
 ## 2026-11-04 - Nicknames: Unicode letters, numbers and spaces, 1 to 12 characters
 **Context:** The brief says a nickname is optional and has 1 to 12 characters: letters, numbers and spaces only.
 **What I asked the AI:** How to apply that rule precisely.
 **What it gave me:** Two readings: English letters only (A–Z), or letters from any language (Unicode). For Unicode, it suggested normalising accented letters so "é" always counts as one letter, counting characters rather than code units, trimming spaces at the ends, and treating an empty nickname as no nickname.
 **What I changed and why:** Chose Unicode letters and numbers plus spaces. Punctuation and symbols are not allowed, and nicknames keep the brief's 1–12 character limit, so the rule follows the original brief.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I did not understand at first:** I hadn't realised that we needed to define which characters were permitted in nicknames. Once the options were explained, I preferred Unicode support because restricting users to English letters seemed unnecessarily limiting.
 
 ## 2026-11-04 - One set of zod rules for forms, saved teams and imported files
 **Context:** The brief says the team-name and nickname rules must give clear inline messages in forms, and the same rules must apply to imported files.
@@ -209,21 +157,21 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What I asked the AI:** How to version saved teams and recover from bad data.
 **What it gave me:** Save teams with a version number and run upgrades for older versions. When some teams can't be read, three options: all or nothing (lose everything), salvage the valid teams, or silently reset (not allowed by the brief). It recommended salvaging, with a download of the original data.
 **What I changed and why:** Chose salvage. It doesn't make sense to lose valid data just because some of the saved data is corrupted. I added a rule: the original saved data must be kept until I explicitly choose a recovery action, and the app must never silently overwrite data it can't understand, especially data saved by a newer version.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I did not understand at first:** I hadn't realised that saved data needed a versioning strategy, or that changes to the application's data structure could affect information saved by earlier versions of the application.
 
 ## 2026-11-04 - Team analysis: an immune member counts as protection
 **Context:** The brief says to highlight any attacking type that three or more members are weak to "and none resist". It doesn't say whether an immune member counts as resisting.
 **What I asked the AI:** Exact definitions for the analysis.
 **What it gave me:** Weak = 2× or 4×, resist = ½× or ¼×, immune = 0×, using the existing matchup calculation. Two readings of the highlight: literal (only ½× and ¼× count as resisting) or immunity also counts as protection. It recommended the second, because an immune member covers that weakness even better than a resistant one.
-**What I changed and why:** Accepted that immunity counts as protection when deciding whether to highlight a type. Weak, resist and immune stay as three separate counts on screen. TODO: why, in your own words.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Accepted that immunity counts as protection when deciding whether to highlight a type. Weak, resist and immune stay as three separate counts on screen. 
+**What I did not understand at first:** I didn't understand the Pokémon type system or how type effectiveness worked.
 
 ## 2026-11-04 - Reordering a team with Move up / Move down buttons
 **Context:** The brief says team members can be reordered.
 **What I asked the AI:** How the reordering should work.
 **What it gave me:** Move up / Move down buttons, or drag and drop. Drag and drop doesn't work with a keyboard on its own, so it would still need buttons, and a drag-and-drop library would add a dependency.
 **What I changed and why:** Chose the buttons. It is simpler and gives a keyboard-accessible alternative to drag and drop.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I did not understand at first:** I hadn't realised that we needed to decide how users would reorder team members, or that there were different ways of implementng this functionality.
 
 ## 2026-11-04 - Two open tabs stay in sync through the storage event
 **Context:** With teams in localStorage, two tabs could each hold their own copy and overwrite each other's changes.
@@ -231,13 +179,32 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What it gave me:** Accept and document it; listen for the browser's storage event (which fires in the other tabs when one tab saves) and reload teams from storage; or use BroadcastChannel, which adds nothing here. It recommended the storage event.
 **Verified against (checked by the AI during planning):** MDN "Window: storage event" (not fired in the tab that made the change; fired in other tabs of the same site).
 **What I changed and why:** Chose the storage event. Without it, tabs could hold different versions of the teams and one tab could silently overwrite changes made in another. It seemed a reasonable balance between preventing stale data and avoiding unnecessary complexity. Limitation: it doesn't resolve simultaneous edits. If two tabs save at nearly the same moment, the later save wins.
+**What I did not understand at first:** I hadn't realised that each browser tab maintains its own application state, even when both tabs use the same local storage. I also hadn't considered that changes made in one tab would need to be communicated to the other to keep their displayed information consistent.
+
+## 2026-11-09 - Hosting: Render Free, defined by a Render Blueprint instead of Terraform
+**Context:** M5 needs Dexter deployed over HTTPS, with the infrastructure defined as code (Terraform preferred, or a documented equivalent). My overriding constraint: it must cost R0, with no risk of unexpected charges, so no payment card or billing account.
+**What I asked the AI:** While planning M5, to compare hosting options for this app on cost, complexity and infrastructure-as-code support, and to find out whether any option is genuinely free, without counting trials or credits.
+**What it gave me:**
+- Google Cloud Run, Azure Container Apps, AWS, Koyeb and Oracle all need a card or billing account. Fly.io and Railway only offer a trial or credits. Fly.io's Terraform provider is archived, and AWS App Runner no longer takes new customers. Static hosts are free but can't run our container image.
+- Render's free web service needs no payment method. Without one, going over the free limits means **suspension until the next month, not a bill**. The free limits: 750 instance hours and 5 GB of outbound bandwidth a month. The service sleeps after 15 minutes idle and takes about a minute to wake.
+- Render's free plan **can't be managed with Terraform**. Render's API refuses to create free services (an anti-abuse measure), and an open bug in the latest provider makes updates to free services fail. Render's own infrastructure-as-code, a **Blueprint** (`render.yaml` in the repo), does support `plan: free`.
+- Region: Frankfurt rather than Singapore. The two are about the same distance from Johannesburg, but South Africa's undersea cables land mainly in Europe. Measured from my connection: 183 ms to Frankfurt and 324 ms to Singapore (fastest of 15 tries).
+**Verified against (checked by the AI during planning, 2026-11-09):**
+- Render docs: "Free instances" (spin-down, 750 hours, suspension without a payment method), "Outbound bandwidth" (Hobby 5 GB; services spun down until next month without a payment method), "Blueprint YAML reference" (`runtime: image`, `plan: free`, `healthCheckPath`, `envVars`), "Infrastructure as code" (auto sync can be turned off) and "Deploy hooks" (`imgURL` for a specific tag or digest).
+- `render-oss/terraform-provider-render` on GitHub: issue #44 (maintainer: the API doesn't allow creating free services) and issue #80 / PR #105 (updates to free services fail, still open on v1.9.1).
+- Still to be confirmed in step R1, by me in the Render dashboard: that a free service can run a prebuilt image, has a health-check path and a deploy hook, and that sign-up needs no card.
+**What I changed and why:** Chose Render Free with a Blueprint, in Frankfurt, and never adding a payment method. Zero risk of charges matters more to me than Terraform, which the brief prefers but doesn't require. I accept the free tier's limits: cold starts, the 5 GB limit and possible suspension. Blueprint auto sync stays off, so infrastructure changes only apply when I review them and press Manual Sync.
 **What I did not understand at first:** TODO: fill in yourself.
 
-## 2026-11-04 - Deleting a team needs confirmation
-**Context:** Deleting a team can't be undone.
-**What I asked the AI:** How deleting a team should work.
-**What it gave me:** An inline two-step confirmation, the browser's confirm() dialog, or deleting straight away with an Undo option. It recommended the inline confirmation (accessible and testable).
-**What I changed and why:** Approved requiring confirmation before a team is deleted. TODO: why, in your own words.
+## 2026-11-09 - Runtime config: environment variables turned into /config.js when the container starts
+**Context:** The brief requires one image for every environment. The API base URL and an environment name shown in the footer must be supplied when the container starts, not when it is built. Vite writes `import.meta.env` values into the JavaScript at build time, so that can't be used. The solution must also keep the M4 Content Security Policy (CSP) as strict as it is.
+**What I asked the AI:** While planning M5, how to supply these values at container start without weakening the CSP.
+**What it gave me:**
+- Two required environment variables, `DEXTER_API_BASE_URL` and `DEXTER_ENVIRONMENT`. The image has no default values: the container refuses to start if either is missing or invalid.
+- At start, a small script checks them against strict patterns (an `https://` address; a short lower-case name). The nginx image's built-in template step then serves `/config.js`, a one-line file holding the two values, and writes the API's address into the CSP's `connect-src`. `index.html` loads `/config.js` as an ordinary script file before the app, and the app checks the values again with zod.
+- Rejected alternatives: a `/config.json` the app fetches (it would need `connect-src 'self'`, but the brief limits `connect-src` to the API); rewriting the built JavaScript at start (it changes files whose names promise their content never changes); an inline script (the CSP bans it); and having nginx insert a meta tag into every page (it works, but is harder to explain).
+**Verified against (checked by the AI during planning, 2026-11-09):** inside the `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` image itself: `/docker-entrypoint.sh` sources `*.envsh` start-up scripts and stops on errors (`set -e`); `20-envsubst-on-templates.sh` fills in only environment variables that are actually set (narrowed further by `NGINX_ENVSUBST_FILTER`); `/etc/nginx/conf.d` is writable by the unprivileged user. The CSP's `script-src 'self'` already allows a script file from our own site. The order in which the browser runs `config.js` and the app is to be checked on MDN in step R3.
+**What I changed and why:** Accepted. The CSP keeps exactly the same rules: scripts only from our own site, and data only from the configured API. A wrong value stops the container before it serves anything, so on Render the previous version keeps running instead of a broken one.
 **What I did not understand at first:** TODO: fill in yourself.
 
 ## Where AI cost me time

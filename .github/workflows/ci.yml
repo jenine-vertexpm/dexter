@@ -70,6 +70,8 @@ jobs:
         run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" image --input dexter-image.tar --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
 
       - name: "Trivy gate: package-lock.json (fails on fixable HIGH/CRITICAL)"
+        # Also runs when the image gate has failed, so one failure can't hide the other
+        if: ${{ !cancelled() }}
         run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" fs --scanners vuln --include-dev-deps package-lock.json --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
 
       - name: Start the container

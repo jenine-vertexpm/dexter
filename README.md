@@ -1,13 +1,20 @@
 # Dexter
 
+[![CI](https://github.com/jenine-vertexpm/dexter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jenine-vertexpm/dexter/actions/workflows/ci.yml?query=branch%3Amain)
+[![API smoke test](https://github.com/jenine-vertexpm/dexter/actions/workflows/smoke.yml/badge.svg?event=schedule)](https://github.com/jenine-vertexpm/dexter/actions/workflows/smoke.yml)
+
 A Pokédex and team builder built with React, TypeScript and Vite, using the public [PokéAPI](https://pokeapi.co/docs/v2).
 
-> **Status:** M2 (browse and detail) and M3 (teams) are built.
+- **CI** shows whether lint, type checks, all tests, the image build, the vulnerability scan and the browser tests pass on `main`.
+- **API smoke test** shows the result of the latest *daily* check that the live PokéAPI still behaves the way Dexter expects. Manual runs (such as the deliberate "test the alarm" failure) don't change it. See [`docs/TESTING.md`](docs/TESTING.md).
+
+> **Status:** M2 (browse and detail), M3 (teams) and M4 (hardened) are done. Deployment (M5) is next; until then Dexter runs locally only.
 >
 > - **Pokémon list:** one entry per species, 20 per page, with search by name and a filter for one or two types. The page, search and types are kept in the URL, so a list view can be reloaded, bookmarked or shared.
 > - **Detail page** (`/pokemon/<name>`): artwork, number, types, height and weight, base stats, abilities (hidden ones marked), description, evolution chain, type matchups, and links to the previous and next Pokémon.
 > - **Teams** (`/teams` and `/teams/<id>`): build named teams of up to 6 Pokémon, see each team's strengths and weaknesses, and export or import a team as a file. See [Teams](#teams) below.
 > - The list, detail and team pages show a loading message while data loads, and an error message with a Retry button if a request fails. On the detail page, the evolution chain and type matchups load separately, so if one fails the rest of the page still shows. The same goes for the analysis on a team page.
+> - **Hardened (M4):** security headers and a strict Content Security Policy, checked on every pull request; automated accessibility checks (axe); the request budget checked automatically; dependency and image scanning (Trivy, Dependabot); a daily test against the live PokéAPI. See [`SECURITY.md`](SECURITY.md) and [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Teams
 
@@ -66,7 +73,7 @@ Only requests to `pokeapi.co` count towards it. The artwork comes from GitHub's 
 
 ### Measured live
 
-- **Date:** 9 November 2026.
+- **Date:** 9 November 2026. Repeated the same day at the end of M4 on the final code (commit `f268e1f`): the same request counts (21 / 20 / 9 cold; 0 back on page 1), and the same transferred sizes to within 1 kB.
 - **Browser:** Chromium 156.0.8078.4 (the version bundled with Playwright), in a 1280×720 window.
 - **Set-up:** the production container (`docker compose up --build`, http://localhost:8080) talking to the live PokéAPI and artwork servers.
 - **Method:** each request was logged through the Chrome DevTools Protocol, which is where the DevTools Network tab gets its data. The browser cache was disabled, as in DevTools' "Disable cache" option. A Playwright script did the clicking and typing.
@@ -92,10 +99,46 @@ Only requests to `pokeapi.co` count towards it. The artwork comes from GitHub's 
 
 Each letter updates the results straight away. When a letter changes the list, the cards that disappear stop waiting, and their unfinished requests are cancelled (brief §3.2: requests that are no longer needed are cancelled). How many finish first depends on how fast PokéAPI answers, hence the difference between runs. In both runs the search ended on the one card, pikachu. No change was made: about 30 short requests for a whole word is well within fair use.
 
+## Bundle size
+
+Each page's code is downloaded only when that page is first opened (route-level code splitting, M4 H2). Before splitting, the whole app was one 427 kB JavaScript file.
+
+Measured with `npm run build` on 9 November 2026, on commit `f268e1f` (the final M4 app code). "gzip" is the compressed size Vite reports, close to what travels over the network.
+
+**What each page needs on a first visit** (JavaScript only: the main chunk, plus that page's chunk and the shared chunks it imports):
+
+| Page | Raw | gzip |
+|---|---|---|
+| Pokémon list (`/`) | 406.6 kB | 127.5 kB |
+| Pokémon detail (`/pokemon/<name>`) | 408.8 kB | 128.1 kB |
+| Teams (`/teams`) | 410.7 kB | 128.8 kB |
+| Team detail (`/teams/<id>`) | 414.8 kB | 130.6 kB |
+| Not found | 384.2 kB | 118.9 kB |
+
+**The chunks**
+
+| Chunk | Raw | gzip | Contains |
+|---|---|---|---|
+| `index` (main) | 383.8 kB | 118.7 kB | React, React Router, TanStack Query, zod, the API client and the team store: what every page needs |
+| `pokeApiQueries` | 15.4 kB | 5.5 kB | the PokéAPI queries and data mapping, shared by the pages that load Pokémon |
+| `TeamDetailPage` | 7.4 kB | 2.7 kB | the team page |
+| `teamFile` | 6.6 kB | 2.7 kB | team file export and import (Teams and team pages) |
+| `PokemonDetailPage` | 5.7 kB | 1.9 kB | the detail page |
+| `TeamsPage` | 4.9 kB | 1.9 kB | the Teams page |
+| `PokemonListPage` | 4.8 kB | 2.0 kB | the list page |
+| `TeamPicker` | 2.3 kB | 1.1 kB | "Add Pokémon to:" and the add buttons |
+| `matchups` | 1.1 kB | 0.6 kB | type matchups (detail page and team analysis) |
+| `NotFoundPage` | 0.3 kB | 0.2 kB | the not-found page |
+| `battleTypes` | 0.2 kB | 0.2 kB | the list of 18 types |
+| CSS (7 files) | 8.5 kB in total | 3.5 kB in total | the shared styles, plus one file per page or shared part |
+
+The main chunk is most of every page's download. It's the libraries Dexter is built on, and they're downloaded once: every later page only adds its own few kB. All files except `index.html` have a fingerprint in their name and are cached by the browser for a year. `index.html` is checked on every visit, so a new version is picked up straight away.
+
 ## Requirements
 
 - [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (developed on Node 22)
 - npm (comes with Node.js)
+- [Docker](https://www.docker.com/), with Compose, to run the production container and the browser tests (`npm run e2e`)
 
 ## Getting started
 
@@ -122,13 +165,23 @@ Then open the address it prints (usually http://localhost:5173) in your browser.
 | `npm run build` | Type-checks, then builds a production version into `dist/` |
 | `npm run preview` | Serves the built `dist/` folder locally to try the production build |
 | `npm run lint` | Runs the linter (oxlint) |
-| `npm test` | Runs all the tests once (Vitest). Tests use a fake PokéAPI, so they never call the real one |
-| `npm run test:watch` | Runs the tests again each time you save a file |
+| `npm test` | Runs the unit and component tests once (Vitest). They use a fake PokéAPI, so they never call the real one |
+| `npm run test:watch` | Runs those tests again each time you save a file |
+| `npm run e2e` | Runs the end-to-end browser tests (Playwright) against the production container, with recorded PokéAPI answers. Starts the container with `docker compose up --build` if it isn't already running |
+| `npm run e2e:record` | Re-records the PokéAPI answers the end-to-end tests use, from the live API. Run by hand only, when the API has changed (see [`e2e/fixtures/README.md`](e2e/fixtures/README.md)) |
+| `npm run smoke` | Checks that the **live** PokéAPI still behaves the way Dexter expects (also runs daily in GitHub Actions) |
+| `docker compose up --build` | Builds the production image and serves it at http://localhost:8080, with the real security headers |
+
+What each kind of test covers, and what isn't tested and why, is in [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Project documents
 
 This project was built for a two-week AI-assisted React engineering challenge; the brief itself is not included in this repository.
 
+- [`SECURITY.md`](SECURITY.md) – security: the OWASP Top 10:2025 for Dexter, headers and CSP, known limitations, and how to report a vulnerability
+- [`docs/TESTING.md`](docs/TESTING.md) – test strategy: what each level of testing covers, why E2E uses recordings and the smoke test the live API, and what isn't tested
+- [`docs/vulnerability-triage.md`](docs/vulnerability-triage.md) – how vulnerability findings and Dependabot pull requests are handled
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) – decision log
 - [`docs/plans/M2.md`](docs/plans/M2.md) – M2 plan: browse and detail
 - [`docs/plans/M3.md`](docs/plans/M3.md) – M3 plan: teams (decisions D8–D18, storage format, team file format and import rules)
+- [`docs/plans/M4.md`](docs/plans/M4.md) – M4 plan: hardened (decisions D19–D29: E2E, headers and CSP, scanning, smoke test)

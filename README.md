@@ -42,6 +42,56 @@ If Dexter is open in two tabs, a change saved in one tab shows up in the other. 
 
 - New team ids are made with the browser's `crypto.randomUUID()`, which only works on secure pages: `https://` addresses and `localhost`. The usual ways of running the app (the commands below, or Docker on `localhost`) are all secure.
 
+## Request budget
+
+PokéAPI is a free public service, so Dexter keeps its requests low ([fair use](https://pokeapi.co/docs/v2#fairuse)). The budget: a cold load of the first list page makes **no more than 25 requests**, and returning to a page already seen makes **none**.
+
+Only requests to `pokeapi.co` count towards it. The artwork comes from GitHub's servers (`raw.githubusercontent.com`), not from PokéAPI, so it is counted separately below.
+
+**Cold and returning visits.**
+
+- **Cold visit:** the app starts with nothing loaded. The first list page loads the species index (one request, used for paging and search) and one Pokémon per card (20).
+- **Returning:** everything loaded is kept in the app's memory for the rest of the visit and is never fetched again. Going back to a page, or pressing Back after opening a Pokémon, uses what is already there.
+- **Reload or new tab:** that memory is emptied, so a reload or a new tab is a new cold visit.
+
+### Checked automatically
+
+`e2e/request-budget.spec.ts` runs with the other browser tests (`npm run e2e`) on every pull request, against the production container. PokéAPI answers come from recordings (see `e2e/fixtures/README.md`), but the app makes exactly the requests it would make to the live API, so the counts are the same.
+
+| Check | Assertion | Result today |
+|---|---|---|
+| Cold load of the first list page | at most 25 PokéAPI requests, and none for the same address twice | 21 |
+| Page 2, then back to page 1 | no new PokéAPI requests | 0 |
+| Open a Pokémon, then Back to the list | no new PokéAPI requests | 0 |
+
+### Measured live
+
+- **Date:** 9 November 2026.
+- **Browser:** Chromium 156.0.8078.4 (the version bundled with Playwright), in a 1280×720 window.
+- **Set-up:** the production container (`docker compose up --build`, http://localhost:8080) talking to the live PokéAPI and artwork servers.
+- **Method:** each request was logged through the Chrome DevTools Protocol, which is where the DevTools Network tab gets its data. The browser cache was disabled, as in DevTools' "Disable cache" option. A Playwright script did the clicking and typing.
+- **Repeats:** the measurement was run twice. The first run is shown; the second matched it apart from small differences in bytes. "Transferred" means bytes over the network, including headers, as DevTools reports it.
+
+| | PokéAPI | Artwork | App files (HTML, JS, CSS) | Total |
+|---|---|---|---|---|
+| **Cold first page:** requests | **21** | 20 | 9 | 50 |
+| **Cold first page:** transferred | 144 kB | 3.1 MB | 416 kB | 3.7 MB |
+| **Back to page 1** (after page 2): requests | **0** | 0 | 0 | 0 |
+
+- **Artwork is lazy-loaded:** the browser only fetches images that are on screen or about to be, so the artwork count depends on the window size.
+- **Back on page 1 there were no artwork requests either,** even with the cache disabled. The browser kept the images it had already shown in memory.
+
+**Typing "pikachu" quickly** into the search box (100 ms between keys), after the first page had loaded. This is for information only; it is not part of the budget.
+
+| | Run 1 | Run 2 |
+|---|---|---|
+| PokéAPI requests started | 30 | 30 |
+| … cancelled | 26 | 15 |
+| … completed | 4 | 15 |
+| Artwork requests | 4 | 9 |
+
+Each letter updates the results straight away. When a letter changes the list, the cards that disappear stop waiting, and their unfinished requests are cancelled (brief §3.2: requests that are no longer needed are cancelled). How many finish first depends on how fast PokéAPI answers, hence the difference between runs. In both runs the search ended on the one card, pikachu. No change was made: about 30 short requests for a whole word is well within fair use.
+
 ## Requirements
 
 - [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (developed on Node 22)

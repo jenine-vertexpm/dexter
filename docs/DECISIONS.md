@@ -181,6 +181,32 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What I changed and why:** Chose the storage event. Without it, tabs could hold different versions of the teams and one tab could silently overwrite changes made in another. It seemed a reasonable balance between preventing stale data and avoiding unnecessary complexity. Limitation: it doesn't resolve simultaneous edits. If two tabs save at nearly the same moment, the later save wins.
 **What I did not understand at first:** I hadn't realised that each browser tab maintains its own application state, even when both tabs use the same local storage. I also hadn't considered that changes made in one tab would need to be communicated to the other to keep their displayed information consistent.
 
+## 2026-11-09 - Hosting: Render Free, defined by a Render Blueprint instead of Terraform
+**Context:** M5 needs Dexter deployed over HTTPS, with the infrastructure defined as code (Terraform preferred, or a documented equivalent). My overriding constraint: it must cost R0, with no risk of unexpected charges, so no payment card or billing account.
+**What I asked the AI:** While planning M5, to compare hosting options for this app on cost, complexity and infrastructure-as-code support, and to find out whether any option is genuinely free, without counting trials or credits.
+**What it gave me:**
+- Google Cloud Run, Azure Container Apps, AWS, Koyeb and Oracle all need a card or billing account. Fly.io and Railway only offer a trial or credits. Fly.io's Terraform provider is archived, and AWS App Runner no longer takes new customers. Static hosts are free but can't run our container image.
+- Render's free web service needs no payment method. Without one, going over the free limits means **suspension until the next month, not a bill**. The free limits: 750 instance hours and 5 GB of outbound bandwidth a month. The service sleeps after 15 minutes idle and takes about a minute to wake.
+- Render's free plan **can't be managed with Terraform**. Render's API refuses to create free services (an anti-abuse measure), and an open bug in the latest provider makes updates to free services fail. Render's own infrastructure-as-code, a **Blueprint** (`render.yaml` in the repo), does support `plan: free`.
+- Region: Frankfurt rather than Singapore. The two are about the same distance from Johannesburg, but South Africa's undersea cables land mainly in Europe. Measured from my connection: 183 ms to Frankfurt and 324 ms to Singapore (fastest of 15 tries).
+**Verified against (checked by the AI during planning, 2026-11-09):**
+- Render docs: "Free instances" (spin-down, 750 hours, suspension without a payment method), "Outbound bandwidth" (Hobby 5 GB; services spun down until next month without a payment method), "Blueprint YAML reference" (`runtime: image`, `plan: free`, `healthCheckPath`, `envVars`), "Infrastructure as code" (auto sync can be turned off) and "Deploy hooks" (`imgURL` for a specific tag or digest).
+- `render-oss/terraform-provider-render` on GitHub: issue #44 (maintainer: the API doesn't allow creating free services) and issue #80 / PR #105 (updates to free services fail, still open on v1.9.1).
+- Still to be confirmed in step R1, by me in the Render dashboard: that a free service can run a prebuilt image, has a health-check path and a deploy hook, and that sign-up needs no card.
+**What I changed and why:** Chose Render Free with a Blueprint, in Frankfurt, and never adding a payment method. Zero risk of charges matters more to me than Terraform, which the brief prefers but doesn't require. I accept the free tier's limits: cold starts, the 5 GB limit and possible suspension. Blueprint auto sync stays off, so infrastructure changes only apply when I review them and press Manual Sync.
+**What I did not understand at first:** TODO: fill in yourself.
+
+## 2026-11-09 - Runtime config: environment variables turned into /config.js when the container starts
+**Context:** The brief requires one image for every environment. The API base URL and an environment name shown in the footer must be supplied when the container starts, not when it is built. Vite writes `import.meta.env` values into the JavaScript at build time, so that can't be used. The solution must also keep the M4 Content Security Policy (CSP) as strict as it is.
+**What I asked the AI:** While planning M5, how to supply these values at container start without weakening the CSP.
+**What it gave me:**
+- Two required environment variables, `DEXTER_API_BASE_URL` and `DEXTER_ENVIRONMENT`. The image has no default values: the container refuses to start if either is missing or invalid.
+- At start, a small script checks them against strict patterns (an `https://` address; a short lower-case name). The nginx image's built-in template step then serves `/config.js`, a one-line file holding the two values, and writes the API's address into the CSP's `connect-src`. `index.html` loads `/config.js` as an ordinary script file before the app, and the app checks the values again with zod.
+- Rejected alternatives: a `/config.json` the app fetches (it would need `connect-src 'self'`, but the brief limits `connect-src` to the API); rewriting the built JavaScript at start (it changes files whose names promise their content never changes); an inline script (the CSP bans it); and having nginx insert a meta tag into every page (it works, but is harder to explain).
+**Verified against (checked by the AI during planning, 2026-11-09):** inside the `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` image itself: `/docker-entrypoint.sh` sources `*.envsh` start-up scripts and stops on errors (`set -e`); `20-envsubst-on-templates.sh` fills in only environment variables that are actually set (narrowed further by `NGINX_ENVSUBST_FILTER`); `/etc/nginx/conf.d` is writable by the unprivileged user. The CSP's `script-src 'self'` already allows a script file from our own site. The order in which the browser runs `config.js` and the app is to be checked on MDN in step R3.
+**What I changed and why:** Accepted. The CSP keeps exactly the same rules: scripts only from our own site, and data only from the configured API. A wrong value stops the container before it serves anything, so on Render the previous version keeps running instead of a broken one.
+**What I did not understand at first:** TODO: fill in yourself.
+
 ## Where AI cost me time
 
 Times the AI sent me down a wrong path: hallucinated APIs, outdated React patterns, code that looked right and was not.

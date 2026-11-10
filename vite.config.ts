@@ -1,10 +1,28 @@
 import react from '@vitejs/plugin-react'
+import type { Plugin } from 'vite'
 import { configDefaults, defineConfig } from 'vitest/config'
+
+// `npm run dev` only: serves /config.js with the local settings, as the container does when it starts
+// (src/config.ts, M5 plan D38). The production build never contains a config file.
+function devRuntimeConfig(): Plugin {
+  const config = { apiBaseUrl: 'https://pokeapi.co/api/v2', environment: 'local' }
+  return {
+    name: 'dexter-dev-runtime-config',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/config.js', (_request, response) => {
+        response.setHeader('Content-Type', 'application/javascript')
+        response.setHeader('Cache-Control', 'no-cache')
+        response.end(`window.__DEXTER_CONFIG__=${JSON.stringify(config)};\n`)
+      })
+    },
+  }
+}
 
 // https://vite.dev/config/
 // https://vitest.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), devRuntimeConfig()],
   test: {
     // A simulated browser page, so components can render inside Node
     environment: 'jsdom',

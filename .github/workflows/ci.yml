@@ -74,8 +74,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: docker run --rm -v "$PWD:/scan:ro" -w /scan -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" fs --scanners vuln --include-dev-deps package-lock.json --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
 
+      # The image needs its runtime configuration (M5 plan D32) or it won't start. "ci" is a test
+      # run's name, not one of the two environments (local and production).
       - name: Start the container
-        run: docker run --detach --name dexter --publish 8080:8080 dexter:ci
+        run: >-
+          docker run --detach --name dexter --publish 8080:8080
+          -e DEXTER_ENVIRONMENT=ci
+          -e DEXTER_API_BASE_URL=https://pokeapi.co/api/v2
+          dexter:ci
 
       - name: Wait until the container answers
         run: curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors http://localhost:8080/healthz

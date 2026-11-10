@@ -34,6 +34,9 @@ jobs:
   # (M4 plan D19, D24). PokéAPI answers come from e2e/fixtures/api/, so this job never calls the live API.
   image-and-e2e:
     runs-on: ubuntu-latest
+    outputs:
+      # The tested image's ID, so `publish` can check it pushes exactly this image (M5 plan D34)
+      image-id: ${{ steps.build.outputs.image-id }}
     env:
       # Trivy's official image, pinned by digest (v0.76.1, M4 plan D23). Dependabot can't update a
       # digest inside a `docker run`, so this is updated by hand: see docs/vulnerability-triage.md.
@@ -49,9 +52,12 @@ jobs:
       - run: npm ci
 
       - name: Build the production image
+        id: build
         # DEXTER_COMMIT becomes /version.txt (M5 plan D35). On a pull request, GITHUB_SHA is the
         # temporary merge commit GitHub tests; on main, it's the commit that gets deployed.
-        run: docker build --build-arg DEXTER_COMMIT="$GITHUB_SHA" --tag dexter:ci .
+        run: |
+          docker build --build-arg DEXTER_COMMIT="$GITHUB_SHA" --tag dexter:ci .
+          echo "image-id=$(docker image inspect dexter:ci --format '{{.Id}}')" >> "$GITHUB_OUTPUT"
 
       # Vulnerability scanning with Trivy (M4 plan D23), before the image is tested.
       # - The image is handed to Trivy as a file, so Trivy never gets control of Docker itself.
@@ -144,6 +150,17 @@ jobs:
           refuses -e DEXTER_ENVIRONMENT=ci -e DEXTER_API_BASE_URL=http://pokeapi.co/api/v2
           refuses -e 'DEXTER_ENVIRONMENT=ci"};alert(1)//' -e DEXTER_API_BASE_URL=https://pokeapi.co/api/v2
 
+      # On main only, and only once every check above has passed: hand the tested image (the same file
+      # Trivy scanned) to the `publish` job, so the image pushed is the one tested, never a rebuild.
+      - name: Keep the tested image for publishing
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dexter-image
+          path: dexter-image.tar
+          retention-days: 1
+          if-no-files-found: error
+
       # On failure: the HTML report (with screenshots and step-by-step traces) to download from the run's page
       - name: Upload the Playwright report
         if: failure()
@@ -158,3 +175,88 @@ jobs:
         run: |
           docker logs dexter
           docker logs dexter-other || true
+
+  # Publishes the tested image to GitHub Container Registry (M5 plan R6, D31, D34): brief §3.6, "on merge
+  # to main: builds and pushes the image". Runs on pushes to main only (merged pull requests), never on
+  # a pull request, and only after both jobs above have passed.
+  # It never builds anything: it loads the exact image file image-and-e2e built, scanned and tested.
+  publish:
+    needs: [lint-and-typecheck, image-and-e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # The only job allowed to write packages. GITHUB_TOKEN gets this permission for this job only;
+    # no personal token or stored password is needed.
+    permissions:
+      packages: write
+    outputs:
+      # The pushed image's digest (sha256:…), for the deploy job (R8) to deploy exactly this image
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      # ghcr.io/<owner>/<repository>: ghcr.io/jenine-vertexpm/dexter
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dexter-image
+
+      - name: Load the tested image and check it is the same one
+        env:
+          TESTED_IMAGE_ID: ${{ needs.image-and-e2e.outputs.image-id }}
+        run: |
+          docker load --input dexter-image.tar
+          loaded="$(docker image inspect dexter:ci --format '{{.Id}}')"
+          echo "tested: $TESTED_IMAGE_ID"
+          echo "loaded: $loaded"
+          test -n "$TESTED_IMAGE_ID" && test "$loaded" = "$TESTED_IMAGE_ID"
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      # Two tags for one image: sha-<commit> never moves (this exact build); main always points to the
+      # newest image from main. The digest identifies the image itself, whatever its tags.
+      - name: Tag and push the image
+        id: push
+        run: |
+          docker tag dexter:ci "$IMAGE:sha-$GITHUB_SHA"
+          docker tag dexter:ci "$IMAGE:main"
+          docker push "$IMAGE:sha-$GITHUB_SHA"
+          docker push "$IMAGE:main"
+          digest="$(docker buildx imagetools inspect "$IMAGE:sha-$GITHUB_SHA" --format '{{json .Manifest}}' | jq -r .digest)"
+          main_digest="$(docker buildx imagetools inspect "$IMAGE:main" --format '{{json .Manifest}}' | jq -r .digest)"
+          echo "sha-$GITHUB_SHA: $digest"
+          echo "main: $main_digest"
+          test -n "$digest" && test "$digest" = "$main_digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      # Proves the registry copy works: pulled back by digest, started with runtime config, and it
+      # names this commit in /version.txt
+      - name: Pull the published image back and check it
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          docker image rm "$IMAGE:sha-$GITHUB_SHA" "$IMAGE:main" dexter:ci
+          docker pull "$IMAGE@$DIGEST"
+          docker run --detach --name published --publish 8080:8080 \
+            -e DEXTER_ENVIRONMENT=ci -e DEXTER_API_BASE_URL=https://pokeapi.co/api/v2 \
+            "$IMAGE@$DIGEST"
+          curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors http://localhost:8080/healthz
+          served="$(curl --fail --silent --show-error http://localhost:8080/version.txt)"
+          echo "version.txt: $served"
+          test "$served" = "$GITHUB_SHA"
+
+      - name: Summary
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          {
+            echo "### Published image"
+            echo "- \`$IMAGE:sha-$GITHUB_SHA\`"
+            echo "- \`$IMAGE:main\`"
+            echo "- digest \`$DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Log out of GitHub Container Registry
+        if: always()
+        run: docker logout ghcr.io

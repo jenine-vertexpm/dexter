@@ -21,6 +21,7 @@ logs
 Dockerfile
 .dockerignore
 compose.yaml
+render.yaml
 
 # End-to-end tests and their reports run outside the image
 e2e

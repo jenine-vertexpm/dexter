@@ -184,6 +184,11 @@ jobs:
     needs: [lint-and-typecheck, image-and-e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # One publish at a time, so two quick merges can't push :main at the same moment. A running
+    # publish is never cancelled; a newer one waits for it.
+    concurrency:
+      group: publish
+      cancel-in-progress: false
     # The only job allowed to write packages. GITHUB_TOKEN gets this permission for this job only;
     # no personal token or stored password is needed.
     permissions:
@@ -219,6 +224,8 @@ jobs:
       - name: Tag and push the image
         id: push
         run: |
+          # Stop if any part of a pipeline fails (imagetools inspect | jq), not only its last command
+          set -o pipefail
           docker tag dexter:ci "$IMAGE:sha-$GITHUB_SHA"
           docker tag dexter:ci "$IMAGE:main"
           docker push "$IMAGE:sha-$GITHUB_SHA"
@@ -227,7 +234,9 @@ jobs:
           main_digest="$(docker buildx imagetools inspect "$IMAGE:main" --format '{{json .Manifest}}' | jq -r .digest)"
           echo "sha-$GITHUB_SHA: $digest"
           echo "main: $main_digest"
-          test -n "$digest" && test "$digest" = "$main_digest"
+          # Separate commands: `bash -e` stops at the first one that fails (it doesn't inside an && list)
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::Not a valid digest: '$digest'"; exit 1; }
+          [[ "$digest" == "$main_digest" ]] || { echo "::error::sha-$GITHUB_SHA and main point to different images"; exit 1; }
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       # Proves the registry copy works: pulled back by digest, started with runtime config, and it

@@ -8,6 +8,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Runtime configuration (src/config.ts): a plain script runs as soon as it loads, before the
+         app's module script, which waits until the page has been read. Not bundled by Vite on purpose:
+         the container writes it when it starts. -->
+    <script src="/config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -22,6 +22,10 @@ import { toPokemonSummary } from '../src/domain/pokemon.ts'
 import { idFromUrl } from '../src/domain/resourceId.ts'
 import { toSpeciesEntries, type SpeciesEntry } from '../src/domain/speciesList.ts'
 
+// The client reads the API's address from the runtime configuration (src/config.ts), which /config.js
+// sets in a browser. Here, in Node, the test sets it: the real PokéAPI.
+globalThis.__DEXTER_CONFIG__ = { apiBaseUrl: 'https://pokeapi.co/api/v2', environment: 'smoke' }
+
 // The number of species when Dexter was built. New games only ever add species.
 const SPECIES_COUNT_AT_BUILD = 1025
 // The only image host allowed by our Content Security Policy (img-src in nginx/security-headers.inc.template)

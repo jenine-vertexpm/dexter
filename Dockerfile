@@ -17,7 +17,7 @@ RUN printf '%s\n' "$DEXTER_COMMIT" | grep -Eqx '[0-9a-f]{40}|local' \
   && printf '%s\n' "$DEXTER_COMMIT" > dist/version.txt
 
 # Stage 2: serve the built files with nginx. Nothing from stage 1 except dist/ ends up here.
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24
 # Install Alpine's latest security fixes for the system packages. The base image is only rebuilt
 # now and then, and Alpine often ships fixes in between (M4 H8: the base image of 2026-10-19 had
 # 1 critical and 9 high fixable findings). Root is needed only for this one step; nginx itself

@@ -1,6 +1,10 @@
 # Security headers sent with every response (M4 plan §5.1, D21).
 #
-# nginx.conf includes this file in EVERY `location` block. That's on purpose: in nginx, an
+# A template (M5 plan D32, §6.2): when the container starts it's written to
+# /etc/nginx/conf.d/security-headers.inc, with ${DEXTER_API_ORIGIN} filled in. The name ends in .inc,
+# not .conf, because nginx loads every .conf file in conf.d/ on its own; this file must only be included.
+#
+# default.conf.template includes this file in EVERY `location` block. That's on purpose: in nginx, an
 # `add_header` inside a location (like the Cache-Control ones) replaces all add_header lines from
 # the level above, so headers set once at the server level would silently disappear.
 #
@@ -14,12 +18,13 @@
 #   style-src 'self'            only our own CSS files
 #   img-src 'self' https://raw.githubusercontent.com
 #                               our own images (the favicon) and the official artwork host
-#   connect-src https://pokeapi.co
-#                               the app may only fetch data from PokéAPI
+#   connect-src ${DEXTER_API_ORIGIN}
+#                               the app may only fetch data from the configured API (PokéAPI:
+#                               https://pokeapi.co), worked out from DEXTER_API_BASE_URL at start
 #   base-uri 'none'             a <base> tag can't redirect the page's relative links elsewhere
 #   form-action 'none'          no form may submit to any address (ours never submit; JS handles them)
 #   frame-ancestors 'none'      no other site may show Dexter inside a frame (clickjacking)
-add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://raw.githubusercontent.com; connect-src https://pokeapi.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" always;
+add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://raw.githubusercontent.com; connect-src ${DEXTER_API_ORIGIN}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" always;
 
 # HSTS: once seen over HTTPS, the browser uses only HTTPS for this site for a year. Browsers ignore
 # it over plain http://localhost, so it does nothing locally. No includeSubDomains or preload: we

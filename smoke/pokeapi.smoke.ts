@@ -24,7 +24,7 @@ import { toSpeciesEntries, type SpeciesEntry } from '../src/domain/speciesList.t
 
 // The number of species when Dexter was built. New games only ever add species.
 const SPECIES_COUNT_AT_BUILD = 1025
-// The only image host allowed by our Content Security Policy (img-src in nginx/security-headers.conf)
+// The only image host allowed by our Content Security Policy (img-src in nginx/security-headers.inc.template)
 const ARTWORK_PREFIX = 'https://raw.githubusercontent.com/'
 
 let species: SpeciesEntry[]
@@ -110,7 +110,7 @@ it('an unknown species is reported by our client as not-found', async () => {
 })
 
 // 6. Artwork must come from the one image host our CSP allows. If PokéAPI moves its images,
-//    img-src in nginx/security-headers.conf has to change too, or every image is blocked.
+//    img-src in nginx/security-headers.inc.template has to change too, or every image is blocked.
 it('artwork URLs still point at the host our CSP allows', async () => {
   // Pokémon #1 by id, exactly as a list card loads it, and eevee by name, as the detail page does
   const [bulbasaur, eevee] = await Promise.all([getPokemonById(1), getPokemon('eevee')])
@@ -118,7 +118,7 @@ it('artwork URLs still point at the host our CSP allows', async () => {
     const { artworkUrl } = toPokemonSummary(pokemon, pokemon.id)
     expect(
       artworkUrl,
-      `${pokemon.name}'s artwork is not on ${ARTWORK_PREFIX}: update img-src in nginx/security-headers.conf`,
+      `${pokemon.name}'s artwork is not on ${ARTWORK_PREFIX}: update img-src in nginx/security-headers.inc.template`,
     ).toMatch(new RegExp(`^${ARTWORK_PREFIX.replaceAll('.', '\\.')}`))
   }
 })

@@ -18,7 +18,7 @@ It describes Dexter as it is on `main` in November 2026 (end of milestone M4). D
 
 Dexter is a Pokédex and team builder that runs **entirely in the visitor's browser**.
 
-- **What is served:** static files only (HTML, JavaScript, CSS, a favicon). They come from nginx in a Docker container ([`Dockerfile`](Dockerfile), [`nginx.conf`](nginx.conf)).
+- **What is served:** static files only (HTML, JavaScript, CSS, a favicon). They come from nginx in a Docker container ([`Dockerfile`](Dockerfile), [`nginx/default.conf.template`](nginx/default.conf.template)).
 - **What Dexter doesn't have:**
   - no backend code
   - no database
@@ -74,7 +74,7 @@ Brief §3.5: *"Treat every input as untrusted."* All checking happens before the
 
 - There are no users, roles or permissions, and no server-side data or functions to protect. Everything Dexter shows is either public (PokéAPI) or the visitor's own data, in their own browser.
 - **CSRF** (another site making your browser send a request "as you"): there is no server that changes anything, and no cookies or logins to ride on.
-- **SSRF** (tricking a server into fetching an address of the attacker's choice): Dexter's server only serves its own static files and never fetches anything ([`nginx.conf`](nginx.conf)).
+- **SSRF** (tricking a server into fetching an address of the attacker's choice): Dexter's server only serves its own static files and never fetches anything ([`nginx/default.conf.template`](nginx/default.conf.template)).
 
 The browser itself keeps each site's `localStorage` separate, so other websites can't read Dexter's saved teams. Anyone using the same device can, though (section 6).
 
@@ -86,7 +86,7 @@ The browser itself keeps each site's `localStorage` separate, so other websites 
 
 **How Dexter handles it:**
 
-- **Security headers on every response, error pages included.** They're set once in [`nginx/security-headers.conf`](nginx/security-headers.conf) and included in **every** `location` in [`nginx.conf`](nginx.conf). In nginx, a header set inside a location would otherwise cancel the shared ones. They're sent with `always`, so a 404 gets them too. Each header is explained in section 4.
+- **Security headers on every response, error pages included.** They're set once in [`nginx/security-headers.inc.template`](nginx/security-headers.inc.template) and included in **every** `location` in [`nginx/default.conf.template`](nginx/default.conf.template). In nginx, a header set inside a location would otherwise cancel the shared ones. They're sent with `always`, so a 404 gets them too. Each header is explained in section 4.
 - **No version number revealed:** `server_tokens off` makes the server say just `nginx`.
 - **A minimal container:** non-root user 101, only the files needed to serve the app, and Alpine's latest security fixes installed at build time (`apk upgrade` in the [`Dockerfile`](Dockerfile)).
 - **Correct caching:** fingerprinted assets are cached for a year, and `index.html` is checked every time, so a security fix reaches visitors on their next visit.
@@ -238,7 +238,7 @@ All three are listed in section 6.
   - CI fails on lint, type, test, E2E, header or CSP problems, and on fixable serious vulnerabilities (Trivy).
   - Dependabot alerts.
   - A **daily smoke test** against the live PokéAPI ([`.github/workflows/smoke.yml`](.github/workflows/smoke.yml)), whose failure shows red in the Actions tab and sends a GitHub notification. The alarm was tested with a deliberate failure in M4 H9.
-- **Server logs:** nginx writes access and error logs to the container's output; the health check is excluded (`access_log off` in [`nginx.conf`](nginx.conf)).
+- **Server logs:** nginx writes access and error logs to the container's output; the health check is excluded (`access_log off` in [`nginx/default.conf.template`](nginx/default.conf.template)).
 
 **Why only partly:**
 
@@ -273,7 +273,7 @@ All three are listed in section 6.
 
 ## 4. Security headers
 
-They're set in [`nginx/security-headers.conf`](nginx/security-headers.conf) and checked by [`e2e/headers.spec.ts`](e2e/headers.spec.ts). You can see them yourself with `curl -I http://localhost:8080/`.
+They're set in [`nginx/security-headers.inc.template`](nginx/security-headers.inc.template) and checked by [`e2e/headers.spec.ts`](e2e/headers.spec.ts). You can see them yourself with `curl -I http://localhost:8080/`.
 
 | Header | Value | What it does |
 |---|---|---|

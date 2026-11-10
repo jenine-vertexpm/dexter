@@ -1,0 +1,5 @@
+# Files that run or are read inside the Linux container must keep Unix line endings (LF), even when
+# Git on Windows converts other files to CRLF. A shell script with CRLF fails in the container.
+*.envsh    text eol=lf
+*.sh       text eol=lf
+*.template text eol=lf

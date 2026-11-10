@@ -1,0 +1,61 @@
+#!/bin/sh
+# Dexter's runtime configuration (M5 plan D32, §6.1).
+#
+# The nginx image runs every file in /docker-entrypoint.d/ in name order when the container starts.
+# A file ending in .envsh is "sourced": it runs inside the start-up shell, so variables it exports are
+# still there for the next step, 20-envsubst-on-templates.sh, which copies /etc/nginx/templates/*.template
+# into /etc/nginx/conf.d/ and fills in ${DEXTER_...} with the values below.
+#
+# Both settings are required and have no defaults: the image itself contains no environment's values.
+# If one is missing or doesn't match its pattern, this script prints why and exits with an error,
+# which stops the start-up script (it runs with `set -e`), so nginx never starts. On Render, a new
+# deploy that can't start never becomes healthy, and the previous one keeps serving.
+#
+# Why the patterns are this strict: the values are written into a JavaScript file (/config.js), into
+# nginx's configuration and into the Content-Security-Policy header. None of the allowed characters
+# (no quotes, spaces, semicolons, backslashes, $, < or >, no line breaks) can end a JS string, an
+# nginx line or a CSP directive, so a bad value can't inject anything. The app checks /config.js
+# again with zod.
+
+dexter_config_fail() {
+  echo "Dexter configuration error: $1" >&2
+  echo "The container will not start. Set DEXTER_API_BASE_URL and DEXTER_ENVIRONMENT (see .env.example)." >&2
+  exit 1
+}
+
+# True if $1 is a single line matching the extended regular expression $2 in full
+dexter_config_matches() {
+  case "$1" in
+    *"
+"*) return 1 ;;
+  esac
+  printf '%s' "$1" | grep -Eq "$2"
+}
+
+# The API's base URL, e.g. https://pokeapi.co/api/v2. HTTPS only, lower-case host, optional port,
+# a path of URL-safe characters and no trailing slash.
+if [ -z "${DEXTER_API_BASE_URL:-}" ]; then
+  dexter_config_fail "DEXTER_API_BASE_URL is not set."
+fi
+if ! dexter_config_matches "$DEXTER_API_BASE_URL" '^https://[a-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$'; then
+  dexter_config_fail "DEXTER_API_BASE_URL must be an https:// URL such as https://pokeapi.co/api/v2 (lower-case host, letters, digits and . _ ~ / - in the path)."
+fi
+case "$DEXTER_API_BASE_URL" in
+  */) dexter_config_fail "DEXTER_API_BASE_URL must not end with a slash." ;;
+esac
+
+# The environment's name, shown in the app's footer, e.g. local or production
+if [ -z "${DEXTER_ENVIRONMENT:-}" ]; then
+  dexter_config_fail "DEXTER_ENVIRONMENT is not set."
+fi
+if ! dexter_config_matches "$DEXTER_ENVIRONMENT" '^[a-z][a-z0-9-]{0,19}$'; then
+  dexter_config_fail "DEXTER_ENVIRONMENT must be 1 to 20 lower-case letters, digits or dashes, starting with a letter (e.g. production)."
+fi
+
+# The API's origin (scheme + host + port), for the CSP's connect-src: https://pokeapi.co/api/v2 → https://pokeapi.co
+dexter_config_host="${DEXTER_API_BASE_URL#https://}"
+DEXTER_API_ORIGIN="https://${dexter_config_host%%/*}"
+unset dexter_config_host
+
+export DEXTER_API_BASE_URL DEXTER_ENVIRONMENT DEXTER_API_ORIGIN
+echo "Dexter configuration: environment=$DEXTER_ENVIRONMENT api=$DEXTER_API_BASE_URL"

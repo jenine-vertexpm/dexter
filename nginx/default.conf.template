@@ -1,3 +1,8 @@
+# Dexter's nginx site. This is a template (M5 plan D32, §6.2): when the container starts, the nginx
+# image's 20-envsubst-on-templates.sh writes it to /etc/nginx/conf.d/default.conf, replacing
+# ${DEXTER_...} with the environment variables checked by docker/05-dexter-config.envsh.
+# Only names starting with DEXTER_ are replaced (NGINX_ENVSUBST_FILTER in the Dockerfile), so
+# nginx's own variables such as $uri are left alone.
 server {
     listen 8080;
     server_name _;
@@ -8,15 +13,25 @@ server {
 
     # Health check: answered by nginx itself, never depends on PokéAPI
     location = /healthz {
-        include /etc/nginx/security-headers.conf;
+        include /etc/nginx/conf.d/security-headers.inc;
         access_log off;
         default_type text/plain;
         return 200 "ok\n";
     }
 
+    # Runtime configuration for the app, built from the container's environment variables when it
+    # starts. Loaded by index.html as a separate file, because the CSP forbids inline scripts.
+    # no-cache: browsers must check for a new version every time, so a changed setting applies at once.
+    location = /config.js {
+        include /etc/nginx/conf.d/security-headers.inc;
+        add_header Cache-Control "no-cache";
+        default_type application/javascript;
+        return 200 'window.__DEXTER_CONFIG__={"apiBaseUrl":"${DEXTER_API_BASE_URL}","environment":"${DEXTER_ENVIRONMENT}"};\n';
+    }
+
     # Fingerprinted build output (file name changes when content changes): cache for a year
     location /assets/ {
-        include /etc/nginx/security-headers.conf;
+        include /etc/nginx/conf.d/security-headers.inc;
         add_header Cache-Control "public, max-age=31536000, immutable";
         try_files $uri =404;
     }
@@ -24,7 +39,7 @@ server {
     # Everything else, including index.html: browsers must check for a new version every time.
     # Unknown paths (deep links like /pokemon/eevee) get index.html so the React router can handle them.
     location / {
-        include /etc/nginx/security-headers.conf;
+        include /etc/nginx/conf.d/security-headers.inc;
         add_header Cache-Control "no-cache";
         try_files $uri /index.html;
     }

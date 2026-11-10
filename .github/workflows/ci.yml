@@ -49,7 +49,9 @@ jobs:
       - run: npm ci
 
       - name: Build the production image
-        run: docker build --tag dexter:ci .
+        # DEXTER_COMMIT becomes /version.txt (M5 plan D35). On a pull request, GITHUB_SHA is the
+        # temporary merge commit GitHub tests; on main, it's the commit that gets deployed.
+        run: docker build --build-arg DEXTER_COMMIT="$GITHUB_SHA" --tag dexter:ci .
 
       # Vulnerability scanning with Trivy (M4 plan D23), before the image is tested.
       # - The image is handed to Trivy as a file, so Trivy never gets control of Docker itself.
@@ -86,6 +88,12 @@ jobs:
       - name: Wait until the container answers
         run: curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors http://localhost:8080/healthz
 
+      - name: "/version.txt names the commit this image was built from"
+        run: |
+          served="$(curl --fail --silent --show-error http://localhost:8080/version.txt)"
+          echo "version.txt: $served"
+          test "$served" = "$GITHUB_SHA"
+
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
 
@@ -93,8 +101,48 @@ jobs:
         run: npm run e2e
         env:
           E2E_BASE_URL: http://localhost:8080
-          # The footer must show the name the container was started with (DEXTER_ENVIRONMENT above)
+          # The footer, /config.js and the CSP must show what the container was started with (above)
           E2E_EXPECTED_ENVIRONMENT: ci
+          E2E_EXPECTED_API_BASE_URL: https://pokeapi.co/api/v2
+
+      # One image, every environment (brief §3.4, M5 plan R5): a second container from the SAME
+      # dexter:ci image, nothing rebuilt, with different values. The runtime-config tests must now see
+      # the new values. api.example.test is a made-up address; the browser test never lets a request out.
+      - name: "One image, other config: start a second container from the same image"
+        run: |
+          docker run --detach --name dexter-other --publish 8081:8080 \
+            -e DEXTER_ENVIRONMENT=demo \
+            -e DEXTER_API_BASE_URL=https://api.example.test/v1 \
+            dexter:ci
+          curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors http://localhost:8081/healthz
+          # Both containers run the very same image (same ID)
+          first="$(docker inspect --format '{{.Image}}' dexter)"
+          second="$(docker inspect --format '{{.Image}}' dexter-other)"
+          echo "first container:  $first"
+          echo "second container: $second"
+          test "$first" = "$second"
+
+      - name: "One image, other config: the app follows the second configuration"
+        run: npx playwright test e2e/runtime-config.spec.ts e2e/runtime-config-browser.spec.ts
+        env:
+          E2E_BASE_URL: http://localhost:8081
+          E2E_EXPECTED_ENVIRONMENT: demo
+          E2E_EXPECTED_API_BASE_URL: https://api.example.test/v1
+
+      # A missing or unsafe setting must stop the container before nginx serves anything
+      - name: "One image, bad config: the container refuses to start"
+        run: |
+          refuses() {
+            # `timeout`: a container that wrongly started would keep running; it then fails the grep below
+            if output="$(timeout 30 docker run --rm "$@" dexter:ci 2>&1)"; then
+              echo "::error::The container started with: $*"; exit 1
+            fi
+            echo "$output" | grep "Dexter configuration error" || { echo "$output"; echo "::error::No configuration error for: $*"; exit 1; }
+          }
+          refuses -e DEXTER_ENVIRONMENT=ci
+          refuses -e DEXTER_API_BASE_URL=https://pokeapi.co/api/v2
+          refuses -e DEXTER_ENVIRONMENT=ci -e DEXTER_API_BASE_URL=http://pokeapi.co/api/v2
+          refuses -e 'DEXTER_ENVIRONMENT=ci"};alert(1)//' -e DEXTER_API_BASE_URL=https://pokeapi.co/api/v2
 
       # On failure: the HTML report (with screenshots and step-by-step traces) to download from the run's page
       - name: Upload the Playwright report
@@ -105,6 +153,8 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
-      - name: Show the container's log
+      - name: Show the containers' logs
         if: failure()
-        run: docker logs dexter
+        run: |
+          docker logs dexter
+          docker logs dexter-other || true

@@ -1,7 +1,12 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll } from 'vitest'
+import { API } from './handlers.ts'
 import { server } from './server.ts'
+
+// What /config.js sets in a real browser (src/config.ts, M5 plan D38). The API address is the one the
+// test handlers answer for, so requests from the app reach them.
+globalThis.__DEXTER_CONFIG__ = { apiBaseUrl: API, environment: 'test' }
 
 // How long findBy… and waitFor keep looking before they give up (the default is 1 second).
 // Pages load on demand (App.tsx), and the first time a test file shows a page its code has to be

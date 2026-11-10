@@ -93,6 +93,8 @@ jobs:
         run: npm run e2e
         env:
           E2E_BASE_URL: http://localhost:8080
+          # The footer must show the name the container was started with (DEXTER_ENVIRONMENT above)
+          E2E_EXPECTED_ENVIRONMENT: ci
 
       # On failure: the HTML report (with screenshots and step-by-step traces) to download from the run's page
       - name: Upload the Playwright report

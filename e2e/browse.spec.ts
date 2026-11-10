@@ -44,3 +44,13 @@ test('browse the Pokémon list and move between pages', async ({ page }) => {
   await expect(page).toHaveURL(/\?page=2$/)
   await expect(cards.first()).toHaveAccessibleName('spearow')
 })
+
+// The footer names the environment the container was started with (brief §3.4, M5 R4). The name comes
+// from /config.js, written when the container starts, so this checks the real runtime configuration.
+// CI starts its container with DEXTER_ENVIRONMENT=ci and sets E2E_EXPECTED_ENVIRONMENT=ci;
+// `npm run e2e` on your machine uses docker compose, which defaults to local.
+test('the footer shows the environment name from the runtime configuration', async ({ page }) => {
+  const expected = process.env.E2E_EXPECTED_ENVIRONMENT ?? 'local'
+  await page.goto('/teams')
+  await expect(page.getByRole('contentinfo')).toHaveText(`Environment: ${expected}`)
+})

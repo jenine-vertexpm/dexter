@@ -18,6 +18,7 @@ import {
   getType,
   REQUEST_TIMEOUT_MS,
 } from './client.ts'
+import { AppConfigError } from '../config.ts'
 
 const POKEMON_URL = 'https://pokeapi.co/api/v2/pokemon/:name'
 
@@ -357,5 +358,36 @@ describe('request timeout', () => {
     controller.abort()
 
     expect(await request).toMatchObject({ name: 'AbortError' })
+  })
+})
+
+// The API's address comes from the runtime configuration (src/config.ts), not from the code
+describe('runtime configuration', () => {
+  const original = globalThis.__DEXTER_CONFIG__
+  afterEach(() => {
+    globalThis.__DEXTER_CONFIG__ = original
+  })
+
+  it('sends requests to the configured API base URL', async () => {
+    globalThis.__DEXTER_CONFIG__ = { apiBaseUrl: 'https://api.example.test/v9', environment: 'demo' }
+    let requested: string | undefined
+    server.use(
+      http.get('https://api.example.test/v9/pokemon/:name', ({ request }) => {
+        requested = request.url
+        return HttpResponse.json(eevee)
+      }),
+    )
+
+    const pokemon = await getPokemon('eevee')
+
+    expect(pokemon.name).toBe('eevee')
+    expect(requested).toBe('https://api.example.test/v9/pokemon/eevee')
+  })
+
+  it('makes no request when the configuration is invalid', async () => {
+    globalThis.__DEXTER_CONFIG__ = { apiBaseUrl: 'http://insecure.example.test', environment: 'demo' }
+
+    // No handler matches, so a request would also fail the test (onUnhandledRequest: 'error')
+    await expect(getPokemon('eevee')).rejects.toThrow(AppConfigError)
   })
 })

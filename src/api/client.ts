@@ -12,8 +12,7 @@ import {
   type ApiSpeciesIndex,
   type ApiType,
 } from './schemas.ts'
-
-const BASE_URL = 'https://pokeapi.co/api/v2'
+import { getAppConfig } from '../config.ts'
 
 // A request that takes longer than this is cancelled and reported as a 'timeout' error
 export const REQUEST_TIMEOUT_MS = 10_000
@@ -60,9 +59,11 @@ async function getJson<Schema extends z.ZodType>(
   }
 
   try {
+    // The API's address comes from the runtime configuration (src/config.ts), e.g. https://pokeapi.co/api/v2
+    const url = `${getAppConfig().apiBaseUrl}${path}`
     let response: Response
     try {
-      response = await fetch(`${BASE_URL}${path}`, { signal: combinedSignal })
+      response = await fetch(url, { signal: combinedSignal })
     } catch (error) {
       throw explain(error, new ApiError('network', 'Could not reach PokéAPI'))
     }

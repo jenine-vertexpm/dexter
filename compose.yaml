@@ -3,6 +3,12 @@ services:
     build: .
     ports:
       - "8080:8080"
+    # Runtime configuration (M5 plan D32), read when the container starts. The defaults after :- are
+    # the "local" environment, so a fresh clone works with no .env file. To change a value, copy
+    # .env.example to .env (Compose reads it automatically) or set the variable in your shell.
+    environment:
+      DEXTER_ENVIRONMENT: ${DEXTER_ENVIRONMENT:-local}
+      DEXTER_API_BASE_URL: ${DEXTER_API_BASE_URL:-https://pokeapi.co/api/v2}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 30s

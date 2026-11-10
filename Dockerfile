@@ -6,6 +6,16 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# Which commit this image was built from (M5 plan D35), served as /version.txt. CI passes the commit's
+# SHA with --build-arg DEXTER_COMMIT=…; a local build says "local". This is the image's identity, the
+# same in every environment, so it belongs in the image (unlike configuration). After a deploy, CI reads
+# /version.txt on the live site to prove the new image is the one serving.
+# Declared after the app build, so a new SHA doesn't make Docker redo `npm run build`.
+ARG DEXTER_COMMIT=local
+RUN printf '%s\n' "$DEXTER_COMMIT" | grep -Eqx '[0-9a-f]{40}|local' \
+    || { echo "DEXTER_COMMIT must be a 40-character commit SHA or 'local'" >&2; exit 1; } \
+  && printf '%s\n' "$DEXTER_COMMIT" > dist/version.txt
+
 # Stage 2: serve the built files with nginx. Nothing from stage 1 except dist/ ends up here.
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24
 # Install Alpine's latest security fixes for the system packages. The base image is only rebuilt

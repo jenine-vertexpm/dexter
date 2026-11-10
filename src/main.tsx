@@ -6,11 +6,26 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import './index.css'
 import App from './App.tsx'
+import { ConfigProblem } from './components/ConfigProblem.tsx'
+import { getAppConfig } from './config.ts'
 import { createQueryClient } from './queries/queryClient.ts'
 import { TeamsProvider } from './teams/TeamsProvider.tsx'
 
 // One cache for the whole visit: everything loaded from PokéAPI is kept here and reused - shared manager for cached data
 const queryClient = createQueryClient()
+
+// The runtime configuration from /config.js (src/config.ts) is checked once, before anything else.
+// If it's missing or invalid, a short message is shown instead of the app (and the reason is logged),
+// so the rest of the app only ever runs with a valid configuration.
+function isConfigured(): boolean {
+  try {
+    getAppConfig()
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
 
 // TeamsProvider holds the user's own teams, kept apart from the PokéAPI cache (decision D8).
 // BrowserRouter keeps the app in sync with the address bar and the Back/Forward buttons.
@@ -18,12 +33,16 @@ const queryClient = createQueryClient()
 // and React cannot keep a text box in step with a delayed ("transition") update.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <TeamsProvider>
-        <BrowserRouter useTransitions={false}>
-          <App />
-        </BrowserRouter>
-      </TeamsProvider>
-    </QueryClientProvider>
+    {isConfigured() ? (
+      <QueryClientProvider client={queryClient}>
+        <TeamsProvider>
+          <BrowserRouter useTransitions={false}>
+            <App />
+          </BrowserRouter>
+        </TeamsProvider>
+      </QueryClientProvider>
+    ) : (
+      <ConfigProblem />
+    )}
   </StrictMode>,
 )

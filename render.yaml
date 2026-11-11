@@ -1,0 +1,34 @@
+# Dexter's deployed infrastructure, as code (M5 plan R7, decision D30): a Render "Blueprint".
+#
+# Render reads this file from the repository and creates or updates the service to match it.
+# It is applied by hand: Blueprint "Auto Sync" is off, so a change here only takes effect when
+# someone reviews it and presses "Manual Sync" in the Render dashboard (like approving a plan).
+#
+# Keys checked against Render's Blueprint reference and JSON schema (render.com/schema/render.yaml.json),
+# 2026-11-10. Zero cost: the free plan, and no payment method on the Render account (D30).
+services:
+  - type: web
+    name: dexter
+    # Pull a ready-made image instead of building one: the image CI built, tested and published (R6)
+    runtime: image
+    plan: free
+    # The nearest Render region to South Africa (M5 plan §5)
+    region: frankfurt
+    image:
+      # Public on GitHub Container Registry, so no credentials are needed. :main is the newest image
+      # from main. Each CI deploy (R8) overrides this with the exact digest it just published, for that
+      # deploy only; a Manual Sync deploys :main again.
+      url: ghcr.io/jenine-vertexpm/dexter:main
+    # Answered by nginx itself, never by PokéAPI, so Render keeps the service up when PokéAPI is down
+    healthCheckPath: /healthz
+    envVars:
+      # Runtime configuration (D32), checked when the container starts: production values for the
+      # same image that runs locally and in CI with other values
+      - key: DEXTER_ENVIRONMENT
+        value: production
+      - key: DEXTER_API_BASE_URL
+        value: https://pokeapi.co/api/v2
+      # Tells Render which port to send traffic to. nginx in the image always listens on 8080; Render's
+      # default is 10000, and it would otherwise have to detect the port.
+      - key: PORT
+        value: "8080"

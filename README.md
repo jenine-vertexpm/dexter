@@ -174,6 +174,14 @@ Then open the address it prints (usually http://localhost:5173) in your browser.
 
 What each kind of test covers, and what isn't tested and why, is in [`docs/TESTING.md`](docs/TESTING.md).
 
+## Infrastructure
+
+The deployed service is described in [`render.yaml`](render.yaml), a [Render Blueprint](https://render.com/docs/infrastructure-as-code): Render's own infrastructure-as-code format, used instead of Terraform because Render's Terraform support can't create free services (decision log, 2026-11-09 "Hosting").
+
+**What it declares:** one free web service, `dexter`, in Render's Frankfurt region. It runs the image CI published to GitHub Container Registry (`ghcr.io/jenine-vertexpm/dexter`); Render never builds anything. It also sets the production runtime configuration (`DEXTER_ENVIRONMENT=production`, `DEXTER_API_BASE_URL`), the port nginx listens on (`8080`), and `/healthz` as the health check.
+
+**How it's applied:** the Blueprint was created once in the Render dashboard from this file. **Auto Sync is off**, so a change to `render.yaml` takes effect only after it's merged *and* someone reviews it in the Render dashboard and presses **Manual Sync**. The Render account has **no payment method**, so it can't be billed: going over the free limits suspends the service until the next month instead.
+
 ## Project documents
 
 This project was built for a two-week AI-assisted React engineering challenge; the brief itself is not included in this repository.

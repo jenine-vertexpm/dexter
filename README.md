@@ -8,7 +8,9 @@ A Pokédex and team builder built with React, TypeScript and Vite, using the pub
 - **CI** shows whether lint, type checks, all tests, the image build, the vulnerability scan and the browser tests pass on `main`.
 - **API smoke test** shows the result of the latest *daily* check that the live PokéAPI still behaves the way Dexter expects. Manual runs (such as the deliberate "test the alarm" failure) don't change it. See [`docs/TESTING.md`](docs/TESTING.md).
 
-> **Status:** M2 (browse and detail), M3 (teams) and M4 (hardened) are done. Deployment (M5) is next; until then Dexter runs locally only.
+> **Live:** <https://dexter-4tho.onrender.com>. It's on a free plan, so after 15 minutes without visitors it sleeps, and the first visit after that can take about a minute to load ([Known limitations](#known-limitations)).
+>
+> **Status:** M1–M5 are done: Dexter is deployed over HTTPS, from the same Docker image CI tested, and every merge to `main` deploys automatically. Two manual checks from the M5 plan are still outstanding ([Known limitations](#known-limitations)).
 >
 > - **Pokémon list:** one entry per species, 20 per page, with search by name and a filter for one or two types. The page, search and types are kept in the URL, so a list view can be reloaded, bookmarked or shared.
 > - **Detail page** (`/pokemon/<name>`): artwork, number, types, height and weight, base stats, abilities (hidden ones marked), description, evolution chain, type matchups, and links to the previous and next Pokémon.
@@ -87,6 +89,7 @@ Only requests to `pokeapi.co` count towards it. The artwork comes from GitHub's 
 
 - **Artwork is lazy-loaded:** the browser only fetches images that are on screen or about to be, so the artwork count depends on the window size.
 - **Back on page 1 there were no artwork requests either,** even with the cache disabled. The browser kept the images it had already shown in memory.
+- **Since M5 there is one more app file:** `/config.js`, the runtime configuration ([Configuration](#configuration)). Counted again on the live site on 12 November 2026 (commit `ff908ac`, cache disabled, 1280×720 and 360×740): **21** PokéAPI requests, 20 artwork, **10** app files. Sizes weren't measured again; `/config.js` is under 100 bytes.
 
 **Typing "pikachu" quickly** into the search box (100 ms between keys), after the first page had loaded. This is for information only; it is not part of the budget.
 
@@ -174,6 +177,87 @@ Then open the address it prints (usually http://localhost:5173) in your browser.
 
 What each kind of test covers, and what isn't tested and why, is in [`docs/TESTING.md`](docs/TESTING.md).
 
+## Architecture
+
+Dexter is a single-page app: everything runs in the visitor's browser. The server is nginx in a container, serving Dexter's own files and nothing else. The browser fetches Pokémon data from PokéAPI and artwork from GitHub directly, so neither passes through Dexter's server.
+
+```mermaid
+flowchart LR
+    subgraph Browser["Visitor's browser"]
+        App["Dexter (React app)"]
+        Store[("localStorage: teams")]
+        App <--> Store
+    end
+
+    subgraph Render["Render (free web service, Frankfurt)"]
+        Nginx["nginx container<br/>app files, /config.js, /healthz"]
+    end
+
+    App -- "HTTPS: app files, /config.js" --> Nginx
+    App -- "HTTPS: Pokémon data (GET)" --> PokeAPI["PokéAPI<br/>pokeapi.co"]
+    App -- "HTTPS: artwork" --> Artwork["GitHub<br/>raw.githubusercontent.com"]
+
+    subgraph Delivery["On every merge to main"]
+        CI["GitHub Actions<br/>build, scan, test"] -- "push the tested image" --> GHCR[("GitHub Container Registry<br/>ghcr.io/jenine-vertexpm/dexter")]
+        CI -- "deploy hook: this image's digest" --> Hook["Render deploy"]
+    end
+
+    GHCR -- "pull by digest" --> Nginx
+    Hook --> Nginx
+```
+
+- **The browser** runs the app, keeps teams in `localStorage`, and fetches data and artwork itself. The Content Security Policy allows only those two outside addresses ([`SECURITY.md`](SECURITY.md)).
+- **The container** (nginx, non-root, port 8080) serves the built files, `/config.js` (this environment's settings), `/version.txt` (the commit it was built from) and `/healthz`. It has no backend code and never calls PokéAPI.
+- **Delivery:** CI builds the image once, tests it, pushes it to GitHub Container Registry and tells Render to run that exact image ([How to deploy](#how-to-deploy)).
+
+## Environments
+
+There are two environments: **local** and **production**. They run the **same image**; only the two settings below differ, and they're given to the container when it starts, never built into the image.
+
+| | Local | Production |
+|---|---|---|
+| Where | your machine: `docker compose up --build`, http://localhost:8080 | Render: <https://dexter-4tho.onrender.com> |
+| Image | built locally from this repository | the image CI built and published, `ghcr.io/jenine-vertexpm/dexter` |
+| Settings come from | [`compose.yaml`](compose.yaml), which uses the defaults below unless a `.env` file or your shell sets them | [`render.yaml`](render.yaml) (`envVars`) |
+| `DEXTER_ENVIRONMENT` | `local` | `production` |
+| `DEXTER_API_BASE_URL` | `https://pokeapi.co/api/v2` | `https://pokeapi.co/api/v2` |
+| HTTPS | no (`http://localhost`) | yes, managed by Render |
+
+Two other places run Dexter, but they aren't environments:
+
+- **`npm run dev`** (the development server) serves `/config.js` itself, with the local values ([`vite.config.ts`](vite.config.ts)). It sends none of the security headers.
+- **CI** starts the image as `ci`, and a second copy with a made-up API address as `demo`, to prove one image follows its configuration ([`docs/TESTING.md`](docs/TESTING.md)).
+
+The environment's name is shown in the footer of every page ("Environment: production").
+
+### Configuration
+
+Dexter has two settings, both **required**: the image has no defaults, so a container started without them refuses to start. [`.env.example`](.env.example) documents both.
+
+| Variable | What it does | Rule |
+|---|---|---|
+| `DEXTER_API_BASE_URL` | Where the app fetches Pokémon data. Its origin (`https://pokeapi.co`) also becomes the only address the CSP's `connect-src` allows | `https://` only, lower-case host, optional port, a path of letters, digits and `. _ ~ / -`, no trailing slash |
+| `DEXTER_ENVIRONMENT` | The name shown in the footer | 1 to 20 lower-case letters, digits or dashes, starting with a letter |
+
+**How it works:** when the container starts, [`docker/05-dexter-config.envsh`](docker/05-dexter-config.envsh) checks both values, then nginx writes them into a one-line `/config.js` and into the CSP header. `index.html` loads `/config.js` before the app, and the app checks the values again ([`src/config.ts`](src/config.ts)). Vite's `import.meta.env` couldn't be used: Vite writes those values into the JavaScript when the app is *built*, so every environment would need its own image.
+
+**If a value is wrong:**
+
+- **Missing or breaking the rule:** the container prints `Dexter configuration error: …` and stops before serving anything. On Render, the new deploy never becomes healthy and the previous version keeps serving.
+- **`/config.js` fails to load in the browser:** the app shows "Dexter isn't configured correctly" instead of a blank page.
+
+Why the rules are this strict (so `/config.js` can't carry injected code): [`SECURITY.md`](SECURITY.md) section 7.1.
+
+**Locally:** `docker compose up --build` works with no `.env` file. To change a value, copy `.env.example` to `.env` (it's never committed) and edit it.
+
+## Health check
+
+`/healthz` answers `ok` (HTTP 200). nginx answers it **itself**: it doesn't load the app and never calls PokéAPI. Render uses it as the service's health check ([`render.yaml`](render.yaml), `healthCheckPath`), as does `compose.yaml` locally.
+
+**Why it must not depend on PokéAPI:** Render acts on a failing health check. During a deploy, it only switches traffic to the new version once the health check passes. On a running service, Render stops sending traffic to an instance that fails its health check for 15 seconds, and restarts it after 60 seconds (Render docs, *Health checks*). If `/healthz` checked PokéAPI, a PokéAPI outage would make Render take Dexter offline and keep restarting it. That would happen even though Dexter could still show teams, cached data and a clear "Could not reach PokéAPI" message with Retry, and restarting can't fix someone else's outage. It would also send PokéAPI a request on every health check. The health check answers one question only: "is *our* server up?"
+
+`e2e/runtime-config.spec.ts` checks `/healthz` in CI, including in a container whose API address doesn't exist, and on the live site after every deploy. Pointing the live service at an unreachable API to watch it stay healthy (the M5 plan's "PokéAPI-down check") hasn't been done yet.
+
 ## Infrastructure
 
 The deployed service is described in [`render.yaml`](render.yaml), a [Render Blueprint](https://render.com/docs/infrastructure-as-code): Render's own infrastructure-as-code format, used instead of Terraform because Render's Terraform support can't create free services (decision log, 2026-11-09 "Hosting").
@@ -181,6 +265,82 @@ The deployed service is described in [`render.yaml`](render.yaml), a [Render Blu
 **What it declares:** one free web service, `dexter`, in Render's Frankfurt region. It runs the image CI published to GitHub Container Registry (`ghcr.io/jenine-vertexpm/dexter`); Render never builds anything. It also sets the production runtime configuration (`DEXTER_ENVIRONMENT=production`, `DEXTER_API_BASE_URL`), the port nginx listens on (`8080`), and `/healthz` as the health check.
 
 **How it's applied:** the Blueprint was created once in the Render dashboard from this file. **Auto Sync is off**, so a change to `render.yaml` takes effect only after it's merged *and* someone reviews it in the Render dashboard and presses **Manual Sync**. The Render account has **no payment method**, so it can't be billed: going over the free limits suspends the service until the next month instead.
+
+## How to deploy
+
+**Merging to `main` deploys.** There's nothing to do by hand. On every push to `main`, [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs:
+
+1. **`lint-and-typecheck`** and **`image-and-e2e`**: the same checks as on a pull request. The image is built **once**, scanned by Trivy and tested.
+2. **`publish`**: pushes **that same image** (no rebuild; its ID is checked) to GitHub Container Registry, tagged `sha-<commit>` and `main`, and records its **digest** (`sha256:…`, the fingerprint of that exact image).
+3. **`deploy`**: calls Render's deploy hook with the image's digest, so Render runs exactly the image that was tested. It waits until `https://dexter-4tho.onrender.com/version.txt` shows the merged commit, then checks the live site's security headers and configuration. The job summary shows the URL, commit and digest.
+
+If any step fails, nothing after it runs. If the new version never becomes healthy, Render keeps the previous one serving and `deploy` fails after 15 minutes. If the live checks fail, the new version *is* already live: the run turns red, and the fix goes through a new pull request.
+
+**Changing the infrastructure** (region, plan, settings, health check): edit [`render.yaml`](render.yaml) in a pull request and merge it. Then, in the Render dashboard, open the Blueprint, review the changes and press **Manual Sync**. Auto Sync is off on purpose, so nothing changes on Render until someone reviews it.
+
+**Rolling back:**
+
+- **Render dashboard:** the service's **Deploys** page → **Rollback** on an earlier successful deploy. It reuses that deploy's image (by digest), so nothing is rebuilt. Render's docs say a rollback from the dashboard also turns off auto-deploy for the service. Dexter doesn't use auto-deploy (CI deploys through the hook), but a deploy from CI after a rollback hasn't been tried yet.
+- **Or re-run an older `deploy` job** in GitHub Actions, which deploys that run's digest again. Not tried yet.
+- Either way, the next merge to `main` deploys the newest image again. To keep a bad change from coming back, revert it in a pull request.
+
+**Rotating the deploy hook** (the only secret): regenerate it in Render, then update the repository secret `RENDER_DEPLOY_HOOK`. The step-by-step is in [`SECURITY.md`](SECURITY.md) section 7.2. The site's address is the repository variable `PRODUCTION_URL` (not secret).
+
+## Image size
+
+| | Size | Measured with |
+|---|---|---|
+| **Download (compressed)** | **28.2 MB** | GHCR manifest for `ghcr.io/jenine-vertexpm/dexter:main` (sum of the layers); `docker images` "CONTENT SIZE" |
+| **Unpacked** | **about 72 MB** | `docker history` (sum of the layers) |
+| On disk after `docker pull` | 99.8 MB | `docker images` "DISK USAGE": the unpacked layers *plus* the compressed copy Docker keeps |
+
+Measured on 12 November 2026, image `sha256:2eec9e9b…` (commit `ff908ac`).
+
+**Why it's that size:** almost all of it is the base image, `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` (25.6 MB compressed):
+
+| Part | Unpacked |
+|---|---|
+| Alpine Linux | 9.1 MB |
+| nginx and the modules the official image ships | 55.3 MB |
+| `apk upgrade`: Alpine security fixes newer than the base image (SECURITY.md A03) | 6.5 MB |
+| **Dexter's built app** (`dist/`, including `version.txt`) | **0.5 MB** |
+| Dexter's nginx templates and start-up script | under 0.1 MB |
+
+The multi-stage build keeps Node, `node_modules` and the source code out of the final image: they're only in the build stage. The app itself is about half a megabyte. A smaller image would mean a different server than the official nginx image, which isn't worth the trade for a few MB.
+
+## Costs
+
+Dexter costs **R0**, with no payment card on any account.
+
+| What | Where | Cost |
+|---|---|---|
+| Running the site | Render Free web service: 750 instance-hours a month, enough for one service all month | R0 |
+| Traffic from Dexter's server | Render: only Dexter's own files (about 0.42 MB on a cold first visit; PokéAPI and artwork go straight to the browser). 5 GB a month free | R0 |
+| Building | GitHub Actions (public repository); Render builds nothing | R0 |
+| Storing and pulling the image | GitHub Container Registry, public package | R0 |
+| HTTPS certificate and address | `*.onrender.com`, managed by Render | R0 |
+
+**At the limits:** the Render account has **no payment method**, so going over the free limits can't produce a bill. Render suspends the service until the next month instead. **Never add a payment method:** that would turn suspension back into billing.
+
+## Known limitations
+
+**From the free hosting:**
+
+- **Cold start:** after 15 minutes without visitors, the service sleeps. The next visit wakes it, which Render says takes about a minute (Render docs, *Free instances*). Later visits are fast again. Not yet timed on Dexter itself: an attempt on 12 November 2026 found the service still awake after 21 minutes without our own traffic.
+- **5 GB of outbound traffic a month.** A cold visit is about 0.42 MB of Dexter's own files, so roughly 12,000 cold visits. Beyond that, the site is offline until the 1st of the next month.
+- **Render may restart free instances at any time**, and says the free plan isn't for production use. Nothing is lost: Dexter keeps no data on the server.
+
+**From the design:**
+
+- **No staging environment:** only local and production (the brief asks for two). The same checks run on the image before it's published, and again on the live site after each deploy.
+- **The live checks run after the deploy,** so a problem they find is already live. There's no automatic rollback ([How to deploy](#how-to-deploy)).
+- **A Render Blueprint instead of Terraform:** Render's Terraform provider can't create free services, so the infrastructure is defined in `render.yaml`, Render's own format ([Infrastructure](#infrastructure)).
+- Teams live only in one browser on one device ([Where your teams are saved](#where-your-teams-are-saved)). Security limitations are listed in [`SECURITY.md`](SECURITY.md) section 6.
+
+**Not yet verified:** two manual checks from the M5 plan (step R7) are still outstanding:
+
+- the **PokéAPI-down check**: point the live service at an unreachable API and confirm the health check stays green;
+- the **Billing check**: confirm in the Render dashboard that no payment method is on file.
 
 ## Project documents
 

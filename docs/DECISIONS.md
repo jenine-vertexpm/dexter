@@ -226,3 +226,9 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 Times the AI sent me down a wrong path: hallucinated APIs, outdated React patterns, code that looked right and was not.
 
 <!-- Add entries here. -->
+
+### 2026-11-11 - Incorrectly reporting R7 as unmerged
+**What happened:** During preparation for R8, Claude incorrectly reported that PR #60 (R7) had not been merged. It relied on an earlier snapshot showing the local working branch as `infra/render-blueprint`, rather than checking the current GitHub `main` branch.
+**The consequence:** This created unnecessary uncertainty about whether R7 needed to be repeated. I had to ask Claude to verify the repository state.
+**What corrected it:** Claude checked GitHub and confirmed that PR #60 had already been merged. The local `main` branch was simply four commits behind `origin/main`.
+**What I learned:** An AI coding assistant's understanding of repository state can become stale. Before acting on claims about branches, commits or pull requests, I should require it to verify the current Git state rather than rely on an earlier snapshot.

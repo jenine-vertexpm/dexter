@@ -2,20 +2,21 @@
 
 This explains how Dexter is tested: what each kind of test checks, why it sits at that level, and what is deliberately **not** tested and why that's acceptable (brief §3.7). Coverage percentages aren't used; the question each test answers is "would this catch the bug?"
 
-Numbers are from `main` on 9 November 2026 (end of M4).
+Numbers are from `main` on 12 November 2026 (M5, after the first automatic deploy).
 
 ## The levels at a glance
 
 | Level | Tool | What it runs against | How many | When it runs | Blocks a merge? |
 |---|---|---|---|---|---|
 | **Static checks** | oxlint, TypeScript (`strict`) | the source code | whole codebase | every PR (`lint-and-typecheck`) | yes |
-| **Unit tests** | Vitest | plain functions, no browser | 557 tests in 29 files, unit and component together | every PR (`lint-and-typecheck`) | yes |
-| **Component tests** | Vitest, jsdom, React Testing Library, MSW | React components with a fake PokéAPI | (included in the 557) | every PR | yes |
-| **End-to-end (E2E)** | Playwright (Chromium), axe-core | the **production Docker image**, with **recorded** PokéAPI answers | 28 tests in 7 files | every PR (`image-and-e2e`) | yes |
+| **Unit tests** | Vitest | plain functions, no browser | 579 tests in 32 files, unit and component together | every PR (`lint-and-typecheck`) | yes |
+| **Component tests** | Vitest, jsdom, React Testing Library, MSW | React components with a fake PokéAPI | (included in the 579) | every PR | yes |
+| **End-to-end (E2E)** | Playwright (Chromium), axe-core | the **production Docker image**, with **recorded** PokéAPI answers | 35 tests in 9 files | every PR (`image-and-e2e`) | yes |
 | **Image and dependency scan** | Trivy | the built image and `package-lock.json` | — | every PR (`image-and-e2e`) | only fixable HIGH/CRITICAL ([policy](vulnerability-triage.md)) |
 | **Smoke test** | Vitest (Node) | the **live** PokéAPI | 6 tests | daily at 05:23 UTC, or by hand | **no**, never runs on PRs |
+| **Deployed checks** | Playwright, **requests only** (no browser) | the **live site**, `https://dexter-4tho.onrender.com` | 10 tests in 2 files (`headers.spec.ts`, `runtime-config.spec.ts`) | after every deploy, on pushes to `main` (`deploy` job) | **no**, they run after the merge; a failure turns `main` red |
 
-Both CI jobs, `lint-and-typecheck` and `image-and-e2e`, are **required checks** on `main` (branch protection), so a failing test stops the merge.
+Both CI jobs, `lint-and-typecheck` and `image-and-e2e`, are **required checks** on `main` (branch protection), so a failing test stops the merge. The deployed checks can't be required checks: they test the site *after* a merge has deployed it.
 
 ## What each level tests, and why there
 
@@ -68,19 +69,23 @@ Playwright drives a real Chromium against the **production Docker image**: nginx
 
 | Spec | Tests | Checks |
 |---|---|---|
-| `browse.spec.ts` | 1 | browse and paginate |
+| `browse.spec.ts` | 2 | browse and paginate; the footer shows the container's environment name |
 | `list.spec.ts` | 2 | search (in the URL, no-match state); filter by two types, kept after a reload |
 | `detail.spec.ts` | 2 | a deep link that survives a reload, plus not-found; a branching evolution chain (eevee, 8 ways) |
 | `teams.spec.ts` | 3 | a full team, with the 7th addition rejected; teams surviving a reload; export then import |
 | `headers.spec.ts` | 5 | every security header and the exact CSP, on `/`, a deep link, an asset, `/healthz` and a 404 |
 | `accessibility.spec.ts` | 12 | axe (WCAG 2.0/2.1 A and AA) on every page and state: list, filters, no results, detail, not-found, teams, delete confirmation, import error, storage notice, team page |
 | `request-budget.spec.ts` | 3 | ≤ 25 PokéAPI requests on a cold first page (21 today); 0 when returning to page 1; 0 after a detail page and Back |
+| `runtime-config.spec.ts` | 5 | requests only: `/config.js` holds exactly the configured values; the CSP's `connect-src` on `/`, `/config.js` and `/healthz` is the configured API; `/healthz` answers without the API |
+| `runtime-config-browser.spec.ts` | 1 | in a browser: the app sends its API requests to the configured address and the footer shows the configured environment |
 
-These are the brief's eight critical paths (the first four rows), plus headers, accessibility and the request budget.
+These are the brief's eight critical paths (the first four rows), plus headers, accessibility, the request budget and the runtime configuration.
 
-Two checks run in **every** E2E test, through the shared fixture [`e2e/fixtures.ts`](../e2e/fixtures.ts):
+**One image, many configurations.** CI runs `runtime-config.spec.ts` and `runtime-config-browser.spec.ts` twice against the **same** image: once in the `ci` container, and again in a second container started with a made-up API address and environment name (`demo`). CI then checks that a missing setting, an `http://` address or a value containing `"};alert(1)//` makes the container refuse to start ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the "One image" steps).
 
-1. **Any CSP violation fails the test.** So all 28 tests also prove the strict CSP doesn't break the app.
+Two checks run in **every** E2E test that uses the shared fixture [`e2e/fixtures.ts`](../e2e/fixtures.ts) (all except the request-only specs and `runtime-config-browser.spec.ts`, which blocks every outside request and checks for CSP errors itself):
+
+1. **Any CSP violation fails the test.** So every journey also proves the strict CSP doesn't break the app.
 2. **Any request to the outside world without a recording fails the test.** This proves CI never touches the live API.
 
 Why here: these are things only a real browser on the real server can show. Routing on a hard reload, headers and the CSP, a file download and upload, data surviving a reload, and the exact number of network requests. They're slower (about 45 seconds for all of them), so only the critical paths are here. The edge cases stay in the faster levels below them.
@@ -114,6 +119,35 @@ It runs from [`.github/workflows/smoke.yml`](../.github/workflows/smoke.yml). A 
 
 **When the smoke test fails:** read which check failed. If PokéAPI changed, adapt the schema or code and re-record with `npm run e2e:record`, so the E2E tests see the new shape too.
 
+## Deployed checks: the live site, after every deploy
+
+A third question needs a third kind of test: "Is *the deployed site* serving what we tested, with the right settings?" CI tests the image, but the live site adds things CI never sees: Render's proxy in front of the container (which could add, drop or change headers), and the production settings from [`render.yaml`](../render.yaml). The brief also asks for the headers to be checked on the deployed site in CI, not by eye (§3.5).
+
+**What runs, and when.** After each merge to `main`, the `deploy` job ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) asks Render to deploy the image just published, waits until the live `/version.txt` names the merged commit, and then runs:
+
+```
+npx playwright test e2e/headers.spec.ts e2e/runtime-config.spec.ts
+```
+
+with `E2E_BASE_URL` set to the production URL (repository variable `PRODUCTION_URL`), and the expected values `production` and `https://pokeapi.co/api/v2`, the ones in `render.yaml`.
+
+| Spec | Tests | What it checks on the live site |
+|---|---|---|
+| `headers.spec.ts` | 5 | Every security header, exactly, including **HSTS** (`max-age=31536000`) and the full CSP, on `/`, a deep link (`/pokemon/eevee`), a real `/assets/` file, `/healthz` and a missing file (404). The cache headers. No version number in `Server` |
+| `runtime-config.spec.ts` | 5 | `/config.js` holds exactly `production` and the PokéAPI address, and nothing else; `connect-src` is `https://pokeapi.co` on `/`, `/config.js` and `/healthz`; `/healthz` answers `ok` |
+
+**Request-only.** Both specs only send HTTP requests and read the answers (Playwright's `request`). They never open a page, so they never run Dexter's JavaScript, never call PokéAPI, and the `deploy` job doesn't install a browser. This was checked in M5 step R5: both pass with no browser installed. Render adds headers of its own (`server: cloudflare`, `rndr-id`, `cf-*`), and the specs allow those, because they check that Dexter's headers are present and correct, not that nothing else is.
+
+**What a failure means.** The new version is already live: these checks run *after* the deploy, so they can't block it. The run on `main` turns red, the Playwright report is uploaded, and the fix goes through a new pull request. There's no automatic rollback; an earlier deploy can be restored by hand in the Render dashboard. If the deploy itself never goes live (for example the container refuses a bad setting), `/version.txt` never changes, the job fails after 15 minutes, and Render keeps the previous version serving.
+
+**Why the browser journeys don't run against production.** The E2E journeys (browse, search, detail, teams, axe) stay in CI, against the container with recordings:
+
+- **They would use the live PokéAPI.** In production the browser fetches from the real API, so the journeys would become flaky for reasons that aren't ours, and every deploy would send a burst of requests to a free service. The recordings-versus-live split above exists exactly to avoid that, and the daily smoke test already covers "does PokéAPI still behave as we expect".
+- **They wouldn't find anything new.** The image is the same one that already passed every journey in CI (same image ID, deployed by digest, `/version.txt` matching). What can differ in production is the **server side**: the proxy, the headers and the settings. That's precisely what the two request-only specs check.
+- **The free plan's limits.** Render's free service has 5 GB of outbound bandwidth a month; a full browser suite on every deploy would spend it on tests.
+
+**Running them by hand:** see the command under "Commands" below. The first request may take about a minute if the free service is asleep.
+
 ## What isn't tested, and why that's acceptable
 
 | Not tested | Why it's acceptable | What reduces the risk |
@@ -128,7 +162,9 @@ It runs from [`.github/workflows/smoke.yml`](../.github/workflows/smoke.yml). A 
 | **Every Pokémon** (E2E has recordings for about 70 of 1025) | The code path is the same for every Pokémon | Unit tests cover the odd cases (forms, no artwork, branching chains); the smoke test checks A1 for all 1025 |
 | **The development server** (`npm run dev`) | It has no security headers or CSP, so E2E against it would hide CSP problems | E2E always runs against the production container (D19) |
 | **Unexpected render crashes** | There's no React error boundary yet, so there's nothing to test. It's a known limitation | Listed in [`SECURITY.md`](../SECURITY.md) section 6 |
-| **The deployed site** | Dexter isn't deployed until M5 | `headers.spec.ts` takes `E2E_BASE_URL`, ready to run against the deployment in M5 |
+| **Browser journeys on the deployed site** | They'd depend on the live PokéAPI, and the image is the one that already passed them in CI (see "Deployed checks" above) | The request-only deployed checks (headers, runtime config, health check) run on the live site after every deploy; `/version.txt` proves which commit is live |
+| **The `http://` → `https://` redirect** | It's done by Render, not by Dexter's container, so there's nothing of ours to test | HSTS is checked on the live site; the redirect was checked by hand with `curl -I` (SECURITY.md A04) |
+| **The health check staying healthy on Render while PokéAPI is down** | Not automated: it means pointing the live service at a broken API address | `/healthz` is answered by nginx alone, and `runtime-config.spec.ts` checks it answers without the API. **The manual check on Render (M5 plan, R7) is still outstanding** |
 | **A coverage percentage** | The brief asks what is tested, not how much; a percentage rewards tests that run code without checking anything | This document |
 
 ## Commands
@@ -140,3 +176,4 @@ It runs from [`.github/workflows/smoke.yml`](../.github/workflows/smoke.yml). A 
 | `npm run e2e` | E2E tests. Starts the container with `docker compose up --build` if it isn't running. Set `E2E_BASE_URL` to test a different address |
 | `npm run e2e:record` | re-records the PokéAPI answers for E2E (live API, by hand only, never in CI) |
 | `npm run smoke` | the smoke test against the live PokéAPI |
+| `E2E_BASE_URL=https://dexter-4tho.onrender.com E2E_EXPECTED_ENVIRONMENT=production npx playwright test e2e/headers.spec.ts e2e/runtime-config.spec.ts` | the deployed checks against the live site (CI runs them after every deploy) |

@@ -375,7 +375,7 @@ How vulnerabilities are found and handled is set out in full in [`docs/vulnerabi
 | **HSTS can't protect a first visit over `http://`** | Before a browser has seen the HSTS header once, a typed `http://` address is sent unencrypted until Render redirects it | Render redirects every `http://` request to `https://`; after that first visit the browser never tries `http://` again for a year. Preloading isn't possible on `onrender.com` (A04) | Accepted |
 | **The deployed checks run after the deploy, not before** | If the live site's headers or configuration came out wrong, visitors would already be getting that version | The same checks pass against the same image in CI before it's published; a failure turns `main` red at once. There's no automatic rollback: an earlier deploy can be restored by hand in the Render dashboard | Accepted (M5 plan D36) |
 | **`/config.js` is code generated when the container starts** | Settings written into a script could, in principle, carry injected code | Strict character rules at start-up and again in the app; a bad value stops the container (section 7.1). Only people who can already change the deployment can set the values | Handled |
-| **The deploy hook is a repository secret, not a GitHub Environment secret** | A workflow started by a pull request from a branch **in this repository** (never from a fork) could read it | Only people with write access can push branches here, and they could already change the workflow itself. A leaked hook can only redeploy Dexter's own images (section 7.2) | Accepted (decision log, 2026-11-11) |
+| **The deploy hook is a repository secret, not a GitHub Environment secret** | A workflow started by a pull request from a branch **in this repository** (never from a fork) could read it | Only people with write access can push branches here, and they could already change the workflow itself. A leaked hook can only redeploy Dexter's own images (section 7.2) | Accepted ([M5 plan](docs/plans/M5.md) D37) |
 | **The container image is public** | Anyone can download it and see exactly what the site serves | Everything in it is already public (the repository and the site itself); it holds no secrets or settings (section 7.3) | Accepted (M5 plan D31) |
 | **"The health check doesn't depend on PokéAPI" isn't yet shown on Render** | Brief §3.4 asks for this to hold on the deployment platform | Shown by the nginx config and in CI (A10) | Open: the M5 plan's PokéAPI-down check (R7) is outstanding |
 | **Base images are pinned by tag, not digest** | A tag can be republished with different contents | Trivy scans every built image; Dependabot proposes updates | Open (A03) |
@@ -392,7 +392,7 @@ How the parts added in M5 (runtime configuration, the deploy secret, the public 
 
 **What it is.** The same image runs locally, in CI and in production (brief §3.4). The two settings that differ, the API's address and the environment's name, are environment variables read when the container **starts**: `DEXTER_API_BASE_URL` and `DEXTER_ENVIRONMENT`. In production they're set in [`render.yaml`](render.yaml) (`https://pokeapi.co/api/v2` and `production`).
 
-**How they're used** (decision log, 2026-11-09):
+**How they're used** ([M5 plan](docs/plans/M5.md) D32, §6.1):
 
 1. [`docker/05-dexter-config.envsh`](docker/05-dexter-config.envsh) checks both values when the container starts and works out the API's origin (`https://pokeapi.co`).
 2. nginx's start-up step fills them into two templates: a one-line `/config.js`, `window.__DEXTER_CONFIG__={"apiBaseUrl":"…","environment":"…"};` ([`nginx/default.conf.template`](nginx/default.conf.template)), and the CSP's `connect-src` ([`nginx/security-headers.inc.template`](nginx/security-headers.inc.template)). Only variables whose names start with `DEXTER_` are filled in (`NGINX_ENVSUBST_FILTER` in the [`Dockerfile`](Dockerfile)).
@@ -424,7 +424,7 @@ Each value must also be a single line. A missing or non-matching value prints `D
 
 - Only the `deploy` job reads it, and that job runs only on pushes to `main`, after `publish` has passed.
 - GitHub hides the secret's value in logs. The job also hides the key part of the URL on its own (`::add-mask::`) and never prints the URL.
-- GitHub never gives repository secrets to workflows started by pull requests **from forks**. A pull request from a branch **in this repository** could read it. Only people with write access can push branches here, and they could already change the workflow itself (decision log, 2026-11-11).
+- GitHub never gives repository secrets to workflows started by pull requests **from forks**. A pull request from a branch **in this repository** could read it. Only people with write access can push branches here, and they could already change the workflow itself ([M5 plan](docs/plans/M5.md) D37).
 - It has never been committed: `git log -p --all | grep -cE 'api\.render\.com/deploy/srv-'` finds nothing (checked 2026-11-12). The backslashes stop the command from matching its own text.
 
 **If it leaked:** someone could make Render redeploy. The deploy call names an image, and Render rejects any image that isn't from Dexter's own path (`ghcr.io/jenine-vertexpm/dexter`), so the worst case is that an older Dexter image is put back live. It can't run someone else's code or expose any data. That older image was itself tested in CI when it was published.

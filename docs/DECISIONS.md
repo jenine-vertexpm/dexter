@@ -208,6 +208,19 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 **What I changed and why:** Accepted. The CSP keeps exactly the same rules: scripts only from our own site, and data only from the configured API. A wrong value stops the container before it serves anything, so on Render the previous version keeps running instead of a broken one.
 **What I did not understand at first:** TODO: fill in yourself.
 
+## 2026-11-11 - Deploy secret: a repository secret, not a GitHub Environment
+**Context:** On merge to `main`, CI must deploy the exact image it just published to Render (brief §3.6). It does this by calling Render's deploy hook, a secret URL. The brief says deployment secrets "live in GitHub Secrets" (§3.5). The M5 plan (D37) had put the hook in a GitHub Environment called `production`: a named deploy target whose secrets only workflows running from `main` can read. I had already saved the hook as an ordinary repository secret, `RENDER_DEPLOY_HOOK`.
+**What I asked the AI:** Whether keeping the repository secret, instead of setting up an Environment, would stop M5 from being met or create a significant security problem.
+**What it gave me:**
+- It still meets the brief: a repository secret is a GitHub Secret, and nothing in the brief asks for an Environment.
+- What an Environment adds: with a repository secret, a workflow started by a pull request from a branch **in this repo** can also read the secret. GitHub never gives secrets to pull requests from forks. Only people with write access can push branches here, and they could already change the workflow itself, so the extra protection is small for a one-person repo.
+- The worst case if the hook leaks: someone could make Render redeploy one of my own images (Render rejects any other image path). It can't put other code on the site or expose data. The fix is "Regenerate Hook" in Render, then updating the secret.
+- Precautions in the `deploy` job: only that job reads the secret; it runs only on pushes to `main`; the key inside the URL is masked and the URL is never printed.
+- The site's address went into a repository **variable**, `PRODUCTION_URL`, since it isn't secret.
+**Verified against (checked by the AI, 2026-11-11):** the brief §3.5 and §3.6. Render docs "Deploy hooks" (the URL is a secret; Regenerate Hook replaces it; 200 started, 202 queued, 400 bad `imgURL`, 404 wrong key) and "Deploy a prebuilt Docker image" (`imgURL` is added to the hook URL, URL-encoded, deploys a tag or digest for that deploy only, and must match the service's image path). The repo's settings via `gh secret list` and `gh variable list` (names only for the secret). The curl call tested against a local stand-in server, which received `…?key=…&imgURL=ghcr.io%2Fjenine-vertexpm%2Fdexter%40sha256%3A…`, the same shape as Render's own example.
+**What I changed and why:** Kept the repository secret `RENDER_DEPLOY_HOOK` and added the repository variable `PRODUCTION_URL`, with no Environment. My priority was the least extra setup to finish M5, and the brief's requirement is met either way. Cost: a branch in this repo could read the secret, and GitHub doesn't show a "Deployments" panel linking to the live site.
+**What I did not understand at first:** TODO: fill in yourself.
+
 ## Where AI cost me time
 
 Times the AI sent me down a wrong path: hallucinated APIs, outdated React patterns, code that looked right and was not.

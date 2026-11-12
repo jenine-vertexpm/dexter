@@ -269,3 +269,121 @@ jobs:
       - name: Log out of GitHub Container Registry
         if: always()
         run: docker logout ghcr.io
+
+  # Deploys the image `publish` just pushed to Render, by digest, then proves it's live (M5 plan R8,
+  # D34–D37): brief §3.6, "then deploys that same image". Pushes to main only, after `publish` passes.
+  # Render never builds anything and doesn't watch the registry: image-backed services only deploy
+  # when asked, here through the service's deploy hook.
+  deploy:
+    needs: [publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Cold start + image pull + the 15-minute wait below, with room to spare
+    timeout-minutes: 30
+    # One deploy at a time: a running deploy is never cancelled, and a newer one waits for it. If
+    # several merges queue up, GitHub keeps only the newest waiting run, so a middle deploy can be
+    # skipped; the site still ends up on the newest image (decision accepted for R8).
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      # The same image path render.yaml gives Render: Render rejects an imgURL with any other path
+      IMAGE: ghcr.io/${{ github.repository }}
+      # Repository variable (not a secret): https://dexter-….onrender.com
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+    steps:
+      # Checks every input first, so a missing setting fails here instead of halfway through
+      - name: Check the deploy settings
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          [[ -n "$RENDER_DEPLOY_HOOK" ]] || { echo "::error::The repository secret RENDER_DEPLOY_HOOK is missing or empty"; exit 1; }
+          [[ "$PRODUCTION_URL" =~ ^https://[^/]+$ ]] || { echo "::error::The repository variable PRODUCTION_URL must be https://<host> with no path or trailing slash, not '$PRODUCTION_URL'"; exit 1; }
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::publish gave no valid digest: '$DIGEST'"; exit 1; }
+          echo "Deploying $IMAGE@$DIGEST to $PRODUCTION_URL"
+
+      # The hook URL is a secret (whoever has it can trigger deploys). GitHub hides its full value in
+      # logs; the key inside it is also hidden on its own (::add-mask::), and the URL is never printed.
+      # imgURL picks the exact image for this deploy only (Render docs, "Deploy a prebuilt Docker
+      # image"); render.yaml's :main stays the service's default. curl URL-encodes it and adds it with
+      # `&`, because the hook URL already has `?key=…`:
+      #   …/deploy/srv-…?key=…&imgURL=ghcr.io%2Fjenine-vertexpm%2Fdexter%40sha256%3A…
+      # Render answers 200 (deploy started), 202 (queued behind a deploy in progress), or an error
+      # such as 400 (imgURL rejected), 404 (wrong or regenerated key) or 409 (service suspended).
+      - name: Ask Render to deploy this exact image
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          key="${RENDER_DEPLOY_HOOK#*key=}"
+          echo "::add-mask::${key%%&*}"
+          status="$(curl --silent --show-error --max-time 60 --output render-response.txt --write-out '%{http_code}' \
+            --request POST --get --data-urlencode "imgURL=$IMAGE@$DIGEST" "$RENDER_DEPLOY_HOOK")"
+          echo "Render answered HTTP $status: $(head -c 500 render-response.txt)"
+          case "$status" in
+            200) echo "Render started the deploy" ;;
+            202) echo "Render queued the deploy behind one already in progress" ;;
+            *) echo "::error::Render refused the deploy (HTTP $status)"; exit 1 ;;
+          esac
+
+      # Proof the deploy finished: /version.txt names the commit the image was built from (D35).
+      # The previous version keeps serving until the new one is healthy, so this waits for the switch.
+      # If it never happens (image pull failed, container refused to start), Render keeps the previous
+      # version running and this job fails after 15 minutes. /version.txt is served with no-cache.
+      - name: Wait until the live site runs this commit
+        run: |
+          deadline=$((SECONDS + 15 * 60))
+          while true; do
+            served="$(curl --silent --max-time 30 "$PRODUCTION_URL/version.txt" || true)"
+            if [[ "$served" == "$GITHUB_SHA" ]]; then
+              echo "Live: $PRODUCTION_URL is running $served"
+              break
+            fi
+            if (( SECONDS >= deadline )); then
+              echo "::error::After 15 minutes $PRODUCTION_URL/version.txt still says '${served:0:80}', not $GITHUB_SHA. Check the deploy in the Render dashboard; the previous version is still serving."
+              exit 1
+            fi
+            echo "Still waiting: the site says '${served:0:80}'"
+            sleep 15
+          done
+
+      # The deployed checks (D36): the security headers (brief §3.5, "check the headers on the deployed
+      # site in CI") and the production runtime config. Both specs only send requests, so no browser is
+      # installed, and they never use PokéAPI.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check the live site's headers and runtime config
+        run: npx playwright test e2e/headers.spec.ts e2e/runtime-config.spec.ts
+        env:
+          E2E_BASE_URL: ${{ vars.PRODUCTION_URL }}
+          # Must match the production values in render.yaml
+          E2E_EXPECTED_ENVIRONMENT: production
+          E2E_EXPECTED_API_BASE_URL: https://pokeapi.co/api/v2
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-production
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Summary
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          {
+            echo "### Deployed"
+            echo "- $PRODUCTION_URL"
+            echo "- commit \`$GITHUB_SHA\`"
+            echo "- image \`$IMAGE@$DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"

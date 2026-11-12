@@ -194,35 +194,19 @@ API data lives in TanStack Query. List state (page, search, types) lives in the 
 - `render-oss/terraform-provider-render` on GitHub: issue #44 (maintainer: the API doesn't allow creating free services) and issue #80 / PR #105 (updates to free services fail, still open on v1.9.1).
 - Checked by me in the Render dashboard in step R1 (2026-11-10), without creating a service: sign-up with GitHub asked for no card; the new web service form let me choose an existing Docker image with the **Free** instance type; the form has a **Health Check Path** field. I cancelled before creating the service.
 - Not verified in R1 (accepted as assumptions): that a free service gets a **deploy hook** (Render's docs don't list it as missing from Free, but don't confirm it either); that the image actually deploys and runs on Free; and whether Render adds or changes response headers such as HSTS or `Server`. The Billing page wasn't checked. These are first tested when the real service is created in step R7.
-**What I changed and why:** Chose Render Free with a Blueprint, in Frankfurt, and never adding a payment method. Zero risk of charges matters more to me than Terraform, which the brief prefers but doesn't require. I accept the free tier's limits: cold starts, the 5 GB limit and possible suspension. Blueprint auto sync stays off, so infrastructure changes only apply when I review them and press Manual Sync.
-**What I did not understand at first:** TODO: fill in yourself.
+**What I changed and why:** Chose Render Free with a Blueprint, in Frankfurt, and never adding a payment method. Zero risk of charges matters more to me than Terraform, which the brief prefers but doesn't require. I accept the free tier's limits.
+**What I did not understand at first:** I don't think there was anything I really misunderstood. It was more a decision around the cos
 
-## 2026-11-09 - Runtime config: environment variables turned into /config.js when the container starts
-**Context:** The brief requires one image for every environment. The API base URL and an environment name shown in the footer must be supplied when the container starts, not when it is built. Vite writes `import.meta.env` values into the JavaScript at build time, so that can't be used. The solution must also keep the M4 Content Security Policy (CSP) as strict as it is.
-**What I asked the AI:** While planning M5, how to supply these values at container start without weakening the CSP.
-**What it gave me:**
-- Two required environment variables, `DEXTER_API_BASE_URL` and `DEXTER_ENVIRONMENT`. The image has no default values: the container refuses to start if either is missing or invalid.
-- At start, a small script checks them against strict patterns (an `https://` address; a short lower-case name). The nginx image's built-in template step then serves `/config.js`, a one-line file holding the two values, and writes the API's address into the CSP's `connect-src`. `index.html` loads `/config.js` as an ordinary script file before the app, and the app checks the values again with zod.
-- Rejected alternatives: a `/config.json` the app fetches (it would need `connect-src 'self'`, but the brief limits `connect-src` to the API); rewriting the built JavaScript at start (it changes files whose names promise their content never changes); an inline script (the CSP bans it); and having nginx insert a meta tag into every page (it works, but is harder to explain).
-**Verified against (checked by the AI during planning, 2026-11-09):** inside the `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` image itself: `/docker-entrypoint.sh` sources `*.envsh` start-up scripts and stops on errors (`set -e`); `20-envsubst-on-templates.sh` fills in only environment variables that are actually set (narrowed further by `NGINX_ENVSUBST_FILTER`); `/etc/nginx/conf.d` is writable by the unprivileged user. The CSP's `script-src 'self'` already allows a script file from our own site. MDN "<script>: The Script element" (checked in step R3, 2026-11-10): a plain script is "fetched and executed immediately before the browser continues to parse the page", while module scripts "defer by default", so `/config.js` runs before the app. Seen working in a browser against the container in R3.
-**What I changed and why:** Accepted. The CSP keeps exactly the same rules: scripts only from our own site, and data only from the configured API. A wrong value stops the container before it serves anything, so on Render the previous version keeps running instead of a broken one.
-**What I did not understand at first:** TODO: fill in yourself.
 
-## 2026-11-11 - Deploy secret: a repository secret, not a GitHub Environment
-**Context:** On merge to `main`, CI must deploy the exact image it just published to Render (brief §3.6). It does this by calling Render's deploy hook, a secret URL. The brief says deployment secrets "live in GitHub Secrets" (§3.5). The M5 plan (D37) had put the hook in a GitHub Environment called `production`: a named deploy target whose secrets only workflows running from `main` can read. I had already saved the hook as an ordinary repository secret, `RENDER_DEPLOY_HOOK`.
-**What I asked the AI:** Whether keeping the repository secret, instead of setting up an Environment, would stop M5 from being met or create a significant security problem.
-**What it gave me:**
-- It still meets the brief: a repository secret is a GitHub Secret, and nothing in the brief asks for an Environment.
-- What an Environment adds: with a repository secret, a workflow started by a pull request from a branch **in this repo** can also read the secret. GitHub never gives secrets to pull requests from forks. Only people with write access can push branches here, and they could already change the workflow itself, so the extra protection is small for a one-person repo.
-- The worst case if the hook leaks: someone could make Render redeploy one of my own images (Render rejects any other image path). It can't put other code on the site or expose data. The fix is "Regenerate Hook" in Render, then updating the secret.
-- Precautions in the `deploy` job: only that job reads the secret; it runs only on pushes to `main`; the key inside the URL is masked and the URL is never printed.
-- The site's address went into a repository **variable**, `PRODUCTION_URL`, since it isn't secret.
-**Verified against (checked by the AI, 2026-11-11):** the brief §3.5 and §3.6. Render docs "Deploy hooks" (the URL is a secret; Regenerate Hook replaces it; 200 started, 202 queued, 400 bad `imgURL`, 404 wrong key) and "Deploy a prebuilt Docker image" (`imgURL` is added to the hook URL, URL-encoded, deploys a tag or digest for that deploy only, and must match the service's image path). The repo's settings via `gh secret list` and `gh variable list` (names only for the secret). The curl call tested against a local stand-in server, which received `…?key=…&imgURL=ghcr.io%2Fjenine-vertexpm%2Fdexter%40sha256%3A…`, the same shape as Render's own example.
-**What I changed and why:** Kept the repository secret `RENDER_DEPLOY_HOOK` and added the repository variable `PRODUCTION_URL`, with no Environment. My priority was the least extra setup to finish M5, and the brief's requirement is met either way. Cost: a branch in this repo could read the secret, and GitHub doesn't show a "Deployments" panel linking to the live site.
-**What I did not understand at first:** TODO: fill in yourself.
 
 ## Where AI cost me time
 
 Times the AI sent me down a wrong path: hallucinated APIs, outdated React patterns, code that looked right and was not.
 
 <!-- Add entries here. -->
+
+### 2026-11-11 - Incorrectly reporting R7 as unmerged
+**What happened:** During preparation for R8, Claude incorrectly reported that PR #60 (R7) had not been merged. It relied on an earlier snapshot showing the local working branch as `infra/render-blueprint`, rather than checking the current GitHub `main` branch.
+**The consequence:** This created unnecessary uncertainty about whether R7 needed to be repeated. I had to ask Claude to verify the repository state.
+**What corrected it:** Claude checked GitHub and confirmed that PR #60 had already been merged. The local `main` branch was simply four commits behind `origin/main`.
+**What I learned:** An AI coding assistant's understanding of repository state can become stale. Before acting on claims about branches, commits or pull requests, I should require it to verify the current Git state.
